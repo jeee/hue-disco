@@ -1,0 +1,15 @@
+{
+  "name": "hue-disco",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Philips Hue disco/music-reactive lighting experiments.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "check": "node --check src/index.js",
+    "test": "npm run check"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

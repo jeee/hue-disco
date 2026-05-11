@@ -275,7 +275,6 @@ Key points:
 - mount `${install_dir}/mg21-native` into the diyHue container
 - patch diyHue at startup and start `mg21_daemon.py`
 - MG21 code is included under `roles/hue_disco/files/mg21-native/`
-- a nested archive is included as `roles/hue_disco/files/mg21-native-code.zip`
 
 
 ## v15 note

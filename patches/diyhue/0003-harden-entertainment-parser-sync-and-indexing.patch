@@ -1,0 +1,53 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenAI <noreply@example.com>
+Date: Fri, 10 Apr 2026 00:00:00 +0000
+Subject: [PATCH] Harden entertainment parser against malformed or truncated
+ frames
+
+Do not crash the entertainment thread when sync detection computes an
+invalid frame size or when a HueStream v2 frame contains a channel index
+outside lights_v2. Log and resync instead.
+---
+ services/entertainment.py | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/services/entertainment.py b/services/entertainment.py
+index 1234567..7654321 100644
+--- a/services/entertainment.py
++++ b/services/entertainment.py
+@@ -120,9 +120,15 @@ def entertainmentService(group, user):
+                   if initMatchBytes == 9:
+                       frameBites = frameID - 8
+                       logging.debug("frameBites: " + str(frameBites))
+-                      p.stdout.read(frameBites - 9) # sync streaming bytes
+-                      init = True
+-                  frameID += 1
++                      if frameBites > 9:
++                          p.stdout.read(frameBites - 9) # sync streaming bytes
++                          init = True
++                      else:
++                          logging.warning("Invalid frameBites during sync: %s", frameBites)
++                          frameBites = 10
++                          frameID = 1
++                          initMatchBytes = 0
++                          continue
++                  frameID += 1
+
+               else:
+                   data = p.stdout.read(frameBites)
+@@ -179,7 +185,12 @@ def entertainmentService(group, user):
+                                   bri = int((data[i+7] * 256 + data[i+8]) / 256)
+                                   r, g, b = convert_xy(x, y, bri)
+                           elif apiVersion == 2:
+-                              light = lights_v2[data[i]]["light"]
++                              if i >= len(data) or data[i] >= len(lights_v2):
++                                  logging.warning(
++                                      "HueStream v2 light index out of range: offset=%s index=%s lights=%s len=%s",
++                                      i, data[i] if i < len(data) else None, len(lights_v2), len(data))
++                                  break
++                              light = lights_v2[data[i]]["light"]
+                               if data[14] == 0: #rgb colorspace
+                                   r = int((data[i+1] * 256 + data[i+2]) / 256)
+                                   g = int((data[i+3] * 256 + data[i+4]) / 256)
+-- 
+2.39.5

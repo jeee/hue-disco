@@ -1,0 +1,61 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenAI <noreply@example.com>
+Date: Fri, 10 Apr 2026 00:00:00 +0000
+Subject: [PATCH] Fix entertainment stream activation on v1 group action endpoint
+
+Handle {"stream":{"active":...}} explicitly in ElementParam.put() for
+/api/<user>/groups/<id>/action.
+
+Before this change, the payload was routed through normal group action
+handling and did not activate the real entertainment stream state. As a
+result, group.stream.active stayed false, owner stayed null, and the
+DTLS listener was not started.
+---
+ flaskUI/restful.py | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
+
+diff --git a/flaskUI/restful.py b/flaskUI/restful.py
+index 1234567..89abcde 100644
+--- a/flaskUI/restful.py
++++ b/flaskUI/restful.py
+@@ -451,13 +451,35 @@ class ElementParam(Resource):
+           logging.info(putDict)
+           if resource == "lights" and param == "state":  # state is applied to a light
+               bridgeConfig[resource][resourceid].setV1State(putDict)
+-          elif param == "action":  # state is applied to a light
++          elif param == "action":  # state is applied to a group
++              if resource == "groups" and "stream" in putDict and "active" in putDict["stream"]:
++                  group = bridgeConfig["groups"][resourceid]
++                  active = bool(putDict["stream"]["active"])
++
++                  group.stream["active"] = active
++                  group.stream["proxymode"] = "auto"
++                  group.stream["proxynode"] = "/bridge"
++
++                  if active:
++                      group.stream["owner"] = username
++                      logging.info("start hue entertainment")
++                      Thread(
++                          target=entertainmentService,
++                          args=[group, bridgeConfig["apiUsers"][username]],
++                          daemon=True
++                      ).start()
++                  else:
++                      group.stream["owner"] = None
++                      logging.info("stop hue entertainent")
++                      Popen(["killall", "openssl"])
++
++                  return [{"success": {f"/groups/{resourceid}/action/stream": {"active": active}}}]
++
+               if "scene" in putDict:
+                   bridgeConfig[resource][resourceid].setV1Action(
+                       state={}, scene=bridgeConfig["scenes"][putDict["scene"]])
+               else:
+                   bridgeConfig[resource][resourceid].setV1Action(
+                       state=putDict, scene=None)
++
+               if "on" in putDict:
+                   bridgeConfig["groups"][resourceid].dxState["any_on"] = currentTime
+                   bridgeConfig["groups"][resourceid].dxState["all_on"] = currentTime
+-- 
+2.39.5

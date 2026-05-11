@@ -1,0 +1,43 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenAI <noreply@example.com>
+Date: Fri, 10 Apr 2026 00:00:00 +0000
+Subject: [PATCH] Avoid duplicate entertainment thread starts on repeated
+ active=true
+
+Only start entertainmentService on the transition from inactive to
+active. This prevents repeated PUT /api/<user>/groups/<id>/action
+requests with {"stream":{"active":true}} from spawning multiple
+openssl listeners on UDP 2100.
+---
+ flaskUI/restful.py | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/flaskUI/restful.py b/flaskUI/restful.py
+index 89abcde..fedcba9 100644
+--- a/flaskUI/restful.py
++++ b/flaskUI/restful.py
+@@ -455,11 +455,17 @@ class ElementParam(Resource):
+               if resource == "groups" and "stream" in putDict and "active" in putDict["stream"]:
+                   group = bridgeConfig["groups"][resourceid]
+                   active = bool(putDict["stream"]["active"])
++                  was_active = bool(group.stream.get("active"))
+
+                   group.stream["active"] = active
+                   group.stream["proxymode"] = "auto"
+                   group.stream["proxynode"] = "/bridge"
+                   if active:
+                       group.stream["owner"] = username
+-                      logging.info("start hue entertainment")
+-                      Thread(target=entertainmentService, args=[
+-                             group, bridgeConfig["apiUsers"][username]], daemon=True).start()
++                      if not was_active:
++                          logging.info("start hue entertainment")
++                          Thread(target=entertainmentService, args=[
++                                 group, bridgeConfig["apiUsers"][username]], daemon=True).start()
++                      else:
++                          logging.info("hue entertainment already active; skipping")
+                   else:
+                       group.stream["owner"] = None
+                       logging.info("stop hue entertainent")
+-- 
+2.39.5

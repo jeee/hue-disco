@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block header_actions %}
+<a href="/admin" class="btn secondary">Admin</a>
+{% endblock %}
+{% block content %}
+{% if state.last_error %}<div class="card"><div class="error"><strong>Bridge/bootstrap status</strong> {{ state.last_error }}</div></div>{% endif %}
+<div class="grid-2">
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:flex-start">
+      <div>
+        <div class="metric">{{ state.mode }}</div>
+        <div class="small">Backend {{ state.backend_mode }} · Detector {{ state.detector_backend }} · Beat mode {{ state.beat_mode }} · Render {{ state.render_mode }}</div>
+      </div>
+      <div class="stack" style="align-items:flex-end">
+        <span class="pill">Profile {{ state.active_profile }}</span>
+        <span class="pill">Render source {{ state.last_render_source or 'n/a' }}</span>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="row">
+      <form method="post" action="/api/control/start"><button>Start disco</button></form>
+      <form method="post" action="/api/control/stop"><button class="secondary">Stop disco</button></form>
+      <form method="post" action="/api/control/on"><button>Lights on</button></form>
+      <form method="post" action="/api/control/off"><button class="secondary">Lights off</button></form>
+      <form method="post" action="/api/control/strobe"><button class="warn">Default strobe {{ state.strobe_seconds }}s</button></form>
+    </div>
+    <div class="divider"></div>
+    <form method="post" action="/api/control/profile" class="row">
+      <div style="min-width:240px;flex:1">
+        <label>Active profile</label>
+        <select name="profile_name">
+          {% for name, profile in state.profiles.items() %}
+          <option value="{{ name }}" {% if name == state.active_profile %}selected{% endif %}>{{ name }}{% if profile.builtin %} · built-in{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="padding-top:34px"><button>Switch profile</button></div>
+    </form>
+    <div class="help" style="margin-top:12px">
+      <strong>How to use this page</strong>
+      Start with a built-in profile such as lounge, house or party. Calibration mode stays in Admin as a timing/debug tool; for real use, hybrid is usually the best default because it blends color motion with pulse brightness instead of acting like a harsh strobe.
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="section-title">Live status</h3>
+    <div class="grid">
+      <div><div class="small">BPM</div><div class="metric" id="bpm">{{ state.bpm_estimate }}</div></div>
+      <div><div class="small">Beat count</div><div class="metric" id="beat_count">{{ state.beat_count }}</div></div>
+      <div><div class="small">Energy</div><div class="metric" id="last_energy">{{ state.last_energy }}</div></div>
+      <div><div class="small">Flux</div><div class="metric" id="last_flux">{{ state.last_flux }}</div></div>
+      <div><div class="small">Band energy</div><div class="metric" id="last_band_energy">{{ state.last_band_energy }}</div></div>
+      <div><div class="small">Onset score</div><div class="metric" id="last_onset_score">{{ state.last_onset_score }}</div></div>
+      <div><div class="small">Phase confidence</div><div class="metric" id="phase_confidence">{{ state.phase_confidence }}</div></div>
+      <div><div class="small">Stream active</div><div class="metric" id="stream_active">{{ state.stream_active }}</div></div>
+    </div>
+    <div class="small" style="margin-top:12px">The status values update every second. If BPM looks wrong on steady dance music, try widening the BPM floor and ceiling slightly or comparing native vs aubio in Admin. Some timing variation can still come from the Zigbee/Hue path, not only the detector.</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3 class="section-title">Active profile groups</h3>
+  <div class="grid-2">
+    {% for group in state.resolved_profile_groups %}
+    <div class="subcard">
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div>
+          <strong>{{ group.name }}</strong>
+          <div class="tiny">Role {{ group.role }} · lights {{ group.light_ids|join(', ') or 'none' }}</div>
+        </div>
+        <span class="pill">{{ group.settings.render_mode }}</span>
+      </div>
+      <div class="tiny" style="margin-top:8px">
+        Intensity {{ group.settings.intensity_mode }} · Grid {{ group.settings.grid_behavior }} · Activity {{ group.settings.group_activity }} · Pulse mix {{ group.settings.pulse_mix }} · Color motion {{ group.settings.color_motion }}
+      </div>
+      {% if group.settings.palette_colors %}
+      <div class="tiny" style="margin-top:8px">Palette {{ group.settings.palette_colors|join(', ') }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h3 class="section-title">Strobe presets</h3>
+    {% if state.strobe_presets %}
+    <div class="row">
+      {% for preset in state.strobe_presets %}
+      <form method="post" action="/api/control/strobe_preset">
+        <input type="hidden" name="preset_name" value="{{ preset.name }}">
+        <button class="warn">{{ preset.name }} · {{ preset.duration }}s{% if preset.sync_mode == 'beat_locked' %} · beat locked{% endif %}</button>
+      </form>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="small">No strobe presets configured yet.</div>
+    {% endif %}
+    <div class="help" style="margin-top:12px">
+      <strong>Strobe tip</strong>
+      Beat-locked strobe keeps flash cadence aligned to the beat grid, but Zigbee bulbs still dislike extremely fast hard strobes. For smoother everyday use, hybrid profiles usually look better than aggressive ON/OFF strobing.
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="section-title">Configured lights</h3>
+    <div class="grid">
+      {% for lamp in (state.lights or []) %}
+      <div class="subcard">
+        <strong>{{ lamp.name }}</strong>
+        <div class="tiny">ID {{ lamp.id }} · max brightness {{ lamp.max_brightness }}</div>
+        {% if lamp.allowed_colors %}<div class="tiny">Allowed colors {{ lamp.allowed_colors|join(', ') }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+async function refreshStatus() {
+  try {
+    const urls = ['/status?_ts=' + Date.now(), '/api/state?_ts=' + Date.now()];
+    let data = null;
+    for (const url of urls) {
+      try {
+        const r = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });
+        if (!r.ok) continue;
+        data = await r.json();
+        break;
+      } catch (e) {}
+    }
+    if (!data) return;
+    const s = data.state || data || {};
+    const map = {
+      bpm: 'bpm_estimate',
+      beat_count: 'beat_count',
+      last_energy: 'last_energy',
+      last_flux: 'last_flux',
+      last_band_energy: 'last_band_energy',
+      last_onset_score: 'last_onset_score',
+      phase_confidence: 'phase_confidence',
+      stream_active: 'stream_active'
+    };
+    for (const [id, key] of Object.entries(map)) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      el.textContent = s[key] ?? '';
+    }
+  } catch (e) {}
+}
+document.addEventListener('DOMContentLoaded', () => setInterval(refreshStatus, 1000));
+</script>
+{% endblock %}

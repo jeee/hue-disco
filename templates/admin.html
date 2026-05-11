@@ -1,0 +1,752 @@
+{% extends "base.html" %}
+{% block header_actions %}
+<a href="/" class="btn secondary">Control</a>
+{% endblock %}
+{% block content %}
+{% if notice %}<div class="card"><div class="ok"><strong>Success</strong> {{ notice }}</div></div>{% endif %}
+{% if error %}<div class="card"><div class="error"><strong>Error</strong> {{ error }}</div></div>{% endif %}
+{% if state.last_error %}<div class="card"><div class="error"><strong>Bridge/bootstrap status</strong> {{ state.last_error }}</div></div>{% endif %}
+<div class="card">
+  <h3 class="section-title">Admin configuration</h3>
+  <div class="small">Admin password can change detector settings, profiles, light groups, and strobe presets. Control password only grants the control page.</div>
+</div>
+
+
+<div class="card stack">
+  <div class="row" style="justify-content:space-between;align-items:flex-start">
+    <div>
+      <h3 class="section-title">Settings backup and restore</h3>
+      <div class="small">Download a versioned backup bundle from the interface, then restore it on a new install or after an upgrade. The import path restores supported settings into the current schema instead of blindly replacing files, so it is more resilient across package versions.</div>
+    </div>
+    <a href="/api/admin/backup/export" class="btn">Download backup</a>
+  </div>
+  <form method="post" action="/api/admin/backup/import" enctype="multipart/form-data" class="row">
+    <input type="file" name="backup_file" accept=".json,.yaml,.yml" required style="max-width:420px">
+    <button type="submit" class="secondary">Restore backup</button>
+  </form>
+  <div class="help">
+    <strong>How restore works</strong>
+    Backups include profile, group, strobe preset, light, detector, bridge, and web settings. They may also contain secrets such as passwords and bridge keys, so store them carefully. On import, the package keeps using the current code and normalizes the restored settings into the current config format.
+  </div>
+</div>
+
+<form method="post" action="/api/admin/save" id="admin-form" class="stack">
+  <div class="grid-2">
+    <div class="card stack">
+      <h3 class="section-title">Transport and discovery</h3>
+      <div>
+        <label>Bridge IP</label>
+        <input name="bridge_ip" value="{{ state.bridge_ip }}">
+      </div>
+      <div>
+        <label>Entertainment group ID</label>
+        <input name="entertainment_group_id" value="{{ state.entertainment_group_id }}">
+      </div>
+      <div class="help">
+        <strong>When to edit these</strong>
+        For diyHue on the Pi, the bridge IP normally stays at 127.0.0.1. For a real Hue bridge, you can now leave Bridge IP blank to let bootstrap try automatic discovery on the local network. Change the entertainment group only if bootstrap or auto-discovery picked the wrong area, or if you intentionally created a different entertainment area.
+      </div>
+    </div>
+
+    <div class="card stack">
+      <h3 class="section-title">Beat detection</h3>
+      <div class="grid">
+        <div>
+          <label>Detector backend <span class="info-tip" tabindex="0" data-tip="Native is the safer default. aubio can feel more musical on some tracks, but it may still lock to half-time on some material.">i</span></label>
+          <select name="detector_backend">
+            <option value="native" {% if state.detector_backend == 'native' %}selected{% endif %}>Native</option>
+            <option value="aubio" {% if state.detector_backend == 'aubio' %}selected{% endif %}>aubio-ledfx</option>
+            <option value="btrack" {% if state.detector_backend == 'btrack' %}selected{% endif %}>BTrack</option>
+          </select>
+        </div>
+        <div>
+          <label>Beat mode <span class="info-tip" tabindex="0" data-tip="Onset only fires on detected hits. Phase locked builds a shared beat grid so multiple bulbs stay together even between strong hits.">i</span></label>
+          <select name="beat_mode">
+            <option value="onset" {% if state.beat_mode == 'onset' %}selected{% endif %}>Onset</option>
+            <option value="phase_locked" {% if state.beat_mode == 'phase_locked' %}selected{% endif %}>Phase locked</option>
+          </select>
+        </div>
+        <div>
+          <label>Grid behavior <span class="info-tip" tabindex="0" data-tip="Continuous always pulses on the beat grid. Gated only pulses when current audio supports it. Adaptive scales pulse strength with the audio.">i</span></label>
+          <select name="grid_behavior">
+            <option value="continuous" {% if state.grid_behavior == 'continuous' %}selected{% endif %}>Continuous</option>
+            <option value="gated" {% if state.grid_behavior == 'gated' %}selected{% endif %}>Gated</option>
+            <option value="adaptive" {% if state.grid_behavior == 'adaptive' %}selected{% endif %}>Adaptive</option>
+          </select>
+        </div>
+        <div>
+          <label>Render FPS</label>
+          <input name="render_fps" value="{{ state.render_fps }}">
+        </div>
+        <div>
+          <label>BPM floor</label>
+          <input name="bpm_min" value="{{ state.bpm_min }}">
+        </div>
+        <div>
+          <label>BPM ceiling</label>
+          <input name="bpm_max" value="{{ state.bpm_max }}">
+        </div>
+        <div>
+          <label>Beat band low Hz</label>
+          <input name="beat_band_low_hz" value="{{ state.beat_band_low_hz }}">
+        </div>
+        <div>
+          <label>Beat band high Hz</label>
+          <input name="beat_band_high_hz" value="{{ state.beat_band_high_hz }}">
+        </div>
+      </div>
+      <div class="help">
+        <strong>Practical detector tips</strong>
+        Onset fires only when the detector itself believes a beat hit happened. Phase locked builds a shared beat grid once tempo is known, which helps multiple bulbs stay on the same rhythm. Gated and adaptive are usually better for lounge, chill, jazz and cuban because they stop the grid from punching hard during quiet passages.
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card stack">
+      <h3 class="section-title">Audio and timing basics</h3>
+      <div class="grid">
+        <div><label>Sample rate</label><input name="sample_rate" value="{{ state.sample_rate }}"></div>
+        <div><label>Block size</label><input name="block_size" value="{{ state.block_size }}"></div>
+        <div><label>Sensitivity</label><input name="sensitivity" value="{{ state.sensitivity }}"></div>
+        <div><label>Min interval ms</label><input name="min_interval_ms" value="{{ state.min_interval_ms }}"></div>
+        <div><label>Energy decay</label><input name="energy_decay" value="{{ state.energy_decay }}"></div>
+        <div><label>Beat prediction ms <span class="info-tip" tabindex="0" data-tip="Fires light output earlier to compensate for processing, network and bulb latency. Positive values usually make Hue bulbs feel more on-beat. Typical range: about 80 to 150 ms.">i</span></label><input name="beat_prediction_ms" value="{{ state.beat_prediction_ms }}"></div>
+        <div><label>Beat subdivision</label><input name="beat_subdivision" value="{{ state.beat_subdivision }}"></div>
+        <div><label>Change every beats</label><input name="change_every_beats" value="{{ state.change_every_beats }}"></div>
+        <div><label>Accent every beats</label><input name="accent_every_beats" value="{{ state.accent_every_beats }}"></div>
+        <div><label>Hue step</label><input name="hue_step" value="{{ state.hue_step }}"></div>
+      </div>
+      <label>Audio device</label>
+      <input name="audio_device" value="{{ state.audio_device if state.audio_device is not none else '' }}">
+      <div class="help">
+        <strong>CPU vs detector quality</strong>
+        Lower sample rates can cut CPU a lot, but on some material they also hurt beat detection. Calibration mode is intentionally a debug tool and its CPU cost should not be treated as final profile runtime cost.
+      </div>
+    </div>
+
+    <div class="card stack">
+      <h3 class="section-title">Global render defaults</h3>
+      <div class="grid">
+        <div>
+          <label>Render mode <span class="info-tip" tabindex="0" data-tip="Hybrid is the normal music mode. Calibration is only for timing tests. Color only reduces beat pulsing; pulse only reduces color motion.">i</span></label>
+          <select name="render_mode">
+            <option value="hybrid" {% if state.render_mode == 'hybrid' %}selected{% endif %}>Hybrid</option>
+            <option value="color_only" {% if state.render_mode == 'color_only' %}selected{% endif %}>Color only</option>
+            <option value="pulse_only" {% if state.render_mode == 'pulse_only' %}selected{% endif %}>Pulse only</option>
+            <option value="calibration" {% if state.render_mode == 'calibration' %}selected{% endif %}>Calibration</option>
+          </select>
+        </div>
+        <div>
+          <label>Intensity mode <span class="info-tip" tabindex="0" data-tip="Fixed gives every pulse the same strength. Audio follows current signal strength. Adaptive keeps a base pulse but grows stronger on stronger musical moments.">i</span></label>
+          <select name="intensity_mode">
+            <option value="fixed" {% if state.intensity_mode == 'fixed' %}selected{% endif %}>Fixed</option>
+            <option value="audio" {% if state.intensity_mode == 'audio' %}selected{% endif %}>Audio</option>
+            <option value="adaptive" {% if state.intensity_mode == 'adaptive' %}selected{% endif %}>Adaptive</option>
+          </select>
+        </div>
+        <div><label>Min pulse level</label><input name="min_pulse_level" value="{{ state.profile_defaults.min_pulse_level }}"></div>
+        <div><label>Max pulse level</label><input name="max_pulse_level" value="{{ state.profile_defaults.max_pulse_level }}"></div>
+        <div><label>Audio intensity gain</label><input name="audio_intensity_gain" value="{{ state.profile_defaults.audio_intensity_gain }}"></div>
+        <div><label>Audio gate threshold</label><input name="audio_gate_threshold" value="{{ state.profile_defaults.audio_gate_threshold }}"></div>
+      </div>
+      <div class="help">
+        <strong>Render mode guide</strong>
+        Calibration is only for timing tests. Color only keeps motion and color changes while minimizing beat pulse. Pulse only strips color motion back to brightness pulses. Hybrid is the intended normal mode because it blends both layers.
+      </div>
+    </div>
+  </div>
+
+  <div class="card stack">
+    <div class="row" style="justify-content:space-between;align-items:flex-start">
+      <div>
+        <h3 class="section-title">Profiles and light groups</h3>
+        <div class="small">Profiles now carry the room style. Inside a profile you can split lights into groups such as ambient, accent or background, each with different brightness, pulse and color behavior while still sharing one timing model.</div>
+      </div>
+      <div class="row">
+        <button type="button" class="secondary" id="add-profile-btn">Add custom profile</button>
+        <button type="button" class="secondary" id="copy-profile-btn">Copy current profile</button>
+        <button type="button" class="danger" id="delete-profile-btn">Delete current profile</button>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="subcard stack">
+        <label>Profile list</label>
+        <select id="profile-select" size="12" style="min-height:280px"></select>
+        <div class="tiny">Built-ins are editable here, but it is safer to copy one into a custom profile before changing it heavily.</div>
+      </div>
+
+      <div class="stack">
+        <div class="subcard stack">
+          <div class="grid">
+            <div><label>Profile name</label><input id="profile-name"></div>
+            <div><label>Description</label><input id="profile-description"></div>
+          </div>
+          <div class="grid">
+            <div><label>Default render mode</label><select id="profile-render-mode"><option>hybrid</option><option>color_only</option><option>pulse_only</option><option>calibration</option></select></div>
+            <div><label>Default intensity mode</label><select id="profile-intensity-mode"><option>adaptive</option><option>audio</option><option>fixed</option></select></div>
+            <div><label>Default grid behavior</label><select id="profile-grid-behavior"><option>adaptive</option><option>gated</option><option>continuous</option></select></div>
+            <div><label>Palette colors</label><input id="profile-palette"></div>
+            <div><label>Palette bias</label><select id="profile-palette-bias"><option>mixed</option><option>warm</option><option>cool</option><option>vivid</option><option>pastel</option><option>deep</option></select></div>
+            <div><label>Static color</label><input id="profile-static-color"></div>
+          </div>
+          <div class="help"><strong>Profile defaults</strong> These values are the room-wide defaults for this profile. Groups inherit them and only need to override what should differ. Put the main room palette here, then use group palettes only when one set of lights should intentionally look different.</div>
+          <div class="grid">
+            <div><label>Base brightness</label><input id="profile-base-brightness"></div>
+            <div><label>Peak brightness</label><input id="profile-peak-brightness"></div>
+            <div><label>Pulse attack ms</label><input id="profile-attack"></div>
+            <div><label>Pulse hold ms</label><input id="profile-hold"></div>
+            <div><label>Pulse decay ms</label><input id="profile-decay"></div>
+            <div><label>Pulse mix</label><input id="profile-pulse-mix"></div>
+            <div><label>Pulse intensity</label><input id="profile-pulse-intensity"></div>
+            <div><label>Color motion</label><input id="profile-color-motion"></div>
+            <div><label>Color step scale</label><input id="profile-color-step"></div>
+            <div><label>Accent every beats</label><input id="profile-accent-every"></div>
+            <div><label>Accent multiplier</label><input id="profile-accent-multiplier"></div>
+            <div><label>Group activity</label><input id="profile-group-activity"></div>
+            <div><label>Min pulse level</label><input id="profile-min-pulse"></div>
+            <div><label>Max pulse level</label><input id="profile-max-pulse"></div>
+            <div><label>Audio gain</label><input id="profile-audio-gain"></div>
+            <div><label>Audio gate</label><input id="profile-audio-gate"></div>
+          </div>
+        </div>
+
+        <div class="subcard stack">
+          <div class="row" style="justify-content:space-between;align-items:flex-start">
+            <div>
+              <strong>Light groups</strong>
+              <div class="tiny">One light should belong to one group inside the active profile. Use groups to keep some bulbs soft and ambient while others pulse harder.</div>
+            </div>
+            <div class="row">
+              <button type="button" class="secondary" id="add-group-btn">Add group</button>
+              <button type="button" class="secondary" id="duplicate-group-btn">Duplicate group</button>
+              <button type="button" class="danger" id="delete-group-btn">Delete group</button>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="stack">
+              <label>Groups in this profile</label>
+              <select id="group-select" size="8" style="min-height:220px"></select>
+            </div>
+            <div class="stack">
+              <div class="grid">
+                <div><label>Group name</label><input id="group-name"></div>
+                <div><label>Role</label><select id="group-role"><option>custom</option><option>ambient</option><option>main</option><option>accent</option><option>background</option><option>percussive</option><option>melodic</option></select></div>
+                <div><label>Render mode <span class="info-tip" tabindex="0" data-tip="Hybrid is the normal music mode. Calibration is only for timing tests. Color only reduces beat pulsing; pulse only reduces color motion.">i</span></label><select id="group-render-mode"><option>hybrid</option><option>color_only</option><option>pulse_only</option><option>calibration</option></select></div>
+                <div><label>Intensity mode <span class="info-tip" tabindex="0" data-tip="Fixed gives every pulse the same strength. Audio follows current signal strength. Adaptive keeps a base pulse but grows stronger on stronger musical moments.">i</span></label><select id="group-intensity-mode"><option>adaptive</option><option>audio</option><option>fixed</option></select></div>
+                <div><label>Grid behavior <span class="info-tip" tabindex="0" data-tip="Continuous always pulses on the beat grid. Gated only pulses when current audio supports it. Adaptive scales pulse strength with the audio.">i</span></label><select id="group-grid-behavior"><option>adaptive</option><option>gated</option><option>continuous</option></select></div>
+                <div><label>Palette colors</label><input id="group-palette"></div>
+                <div><label>Palette bias</label><select id="group-palette-bias"><option>mixed</option><option>warm</option><option>cool</option><option>vivid</option><option>pastel</option><option>deep</option></select></div>
+                <div><label>Static color</label><input id="group-static-color"></div>
+                <div><label>Base brightness</label><input id="group-base"></div>
+                <div><label>Peak brightness</label><input id="group-peak"></div>
+                <div><label>Attack ms</label><input id="group-attack"></div>
+                <div><label>Hold ms</label><input id="group-hold"></div>
+                <div><label>Decay ms</label><input id="group-decay"></div>
+                <div><label>Pulse mix</label><input id="group-pulse-mix"></div>
+                <div><label>Pulse intensity</label><input id="group-pulse-intensity"></div>
+                <div><label>Color motion</label><input id="group-color-motion"></div>
+                <div><label>Color step</label><input id="group-color-step"></div>
+                <div><label>Activity</label><input id="group-activity"></div>
+                <div><label>Accent every</label><input id="group-accent-every"></div>
+                <div><label>Accent multiplier</label><input id="group-accent-multiplier"></div>
+                <div><label>Min pulse</label><input id="group-min-pulse"></div>
+                <div><label>Max pulse</label><input id="group-max-pulse"></div>
+                <div><label>Audio gain</label><input id="group-audio-gain"></div>
+                <div><label>Audio gate</label><input id="group-audio-gate"></div>
+              </div>
+              <div class="help"><strong>Group design tip</strong> Use groups for behavior, not for independent timing. Ambient groups usually want lower activity, lower pulse mix, softer envelopes and warmer palettes. Accent or percussive groups can use stronger pulse intensity, brighter peaks and faster attacks.</div>
+              <div>
+                <label>Lights in this group</label>
+                <div id="group-lights" class="grid"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card stack">
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div>
+          <h3 class="section-title">Strobe presets</h3>
+          <div class="small">Create multiple named strobe buttons for the control page. Beat-locked mode keeps flashes aligned to BPM as well as possible within bulb timing limits.</div>
+        </div>
+        <div class="row">
+          <button type="button" class="secondary" id="add-preset-btn">Add preset</button>
+          <button type="button" class="danger" id="delete-preset-btn">Delete preset</button>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="stack">
+          <label>Preset list</label>
+          <select id="preset-select" size="8" style="min-height:220px"></select>
+        </div>
+        <div class="stack">
+          <div class="grid">
+            <div><label>Default strobe seconds</label><input name="strobe_seconds" value="{{ state.strobe_seconds }}"></div>
+            <div><label>Default on ms</label><input name="strobe_on_ms" value="{{ state.strobe_on_ms }}"></div>
+            <div><label>Default off ms</label><input name="strobe_off_ms" value="{{ state.strobe_off_ms }}"></div>
+            <div><label>Default sync mode</label><select name="strobe_sync_mode"><option value="free" {% if state.strobe_sync_mode == 'free' %}selected{% endif %}>Free</option><option value="beat_locked" {% if state.strobe_sync_mode == 'beat_locked' %}selected{% endif %}>Beat locked</option></select></div>
+          </div>
+          <div class="divider"></div>
+          <div class="grid">
+            <div><label>Preset name</label><input id="preset-name"></div>
+            <div><label>Duration seconds</label><input id="preset-duration"></div>
+            <div><label>On ms</label><input id="preset-on"></div>
+            <div><label>Off ms</label><input id="preset-off"></div>
+            <div><label>Sync mode</label><select id="preset-sync"><option>free</option><option>beat_locked</option></select></div>
+          </div>
+          <div class="help"><strong>Strobe warning</strong> True hard ON/OFF strobe is still limited by Zigbee/Hue bulb behavior. Beat-locked mode is useful for experiments, but pulse-only or hybrid profiles usually give smoother real-world results.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card stack">
+      <h3 class="section-title">Validation and raw JSON</h3>
+      <div id="profile-validation" class="help">
+        Validation runs live while you edit. It is fine to leave some lights unused. The main thing to avoid is assigning the same light to multiple groups in the same profile.
+      </div>
+      <div class="help">
+        <strong>Color model</strong>
+        Color styling now belongs in profiles and profile light groups. Per-light <code>allowed_colors</code> is only a hard safety limit. If a light has no per-light limit, the active group palette wins, then the profile palette, then an internal fallback palette only as a last resort.
+      </div>
+      <details>
+        <summary class="small" style="cursor:pointer">Show raw JSON payloads</summary>
+        <label>Profiles JSON</label>
+        <textarea id="profiles-json-preview" class="mono" readonly></textarea>
+        <label>Strobe presets JSON</label>
+        <textarea id="presets-json-preview" class="mono" readonly></textarea>
+      </details>
+    </div>
+  </div>
+
+  <input type="hidden" name="active_profile" id="active_profile_field">
+  <input type="hidden" name="profiles_json" id="profiles_json">
+  <input type="hidden" name="strobe_presets_json" id="strobe_presets_json">
+
+  <div class="card row" style="justify-content:space-between">
+    <div class="small">Save writes the current UI model back into the installable package config format used by Ansible and the runtime service.</div>
+    <div class="row">
+      <button type="submit">Save configuration</button>
+      <a href="/" class="btn secondary">Back to control</a>
+    </div>
+  </div>
+</form>
+
+<script>
+const initialProfiles = {{ state.profiles | tojson }};
+const initialPresets = {{ state.strobe_presets | tojson }};
+const lights = {{ state.lights | tojson }};
+const initialActiveProfile = {{ state.active_profile | tojson }};
+
+const defaultProfileDefaults = {
+  render_mode: 'hybrid', intensity_mode: 'adaptive', grid_behavior: 'adaptive',
+  base_brightness: 110, peak_brightness: 170, pulse_attack_ms: 80, pulse_hold_ms: 120, pulse_decay_ms: 260,
+  pulse_mix: 0.45, pulse_intensity: 0.7, color_motion: 0.35, color_step_scale: 0.5, change_every_beats: 1,
+  beat_subdivision: 1, accent_every_beats: 4, accent_multiplier: 1.08, min_pulse_level: 0.18, max_pulse_level: 1.0,
+  audio_intensity_gain: 1.0, audio_gate_threshold: 0.12, group_activity: 1.0, palette_colors: [], palette_bias: 'mixed', static_color: ''
+};
+
+let profiles = JSON.parse(JSON.stringify(initialProfiles));
+let strobePresets = JSON.parse(JSON.stringify(initialPresets));
+let currentProfileKey = initialActiveProfile || Object.keys(profiles)[0];
+let currentGroupIndex = 0;
+let currentPresetIndex = 0;
+
+function ensureProfileShape(profile, key) {
+  profile.name = profile.name || key;
+  profile.description = profile.description || '';
+  profile.builtin = !!profile.builtin;
+  profile.profile_defaults = Object.assign({}, defaultProfileDefaults, profile.profile_defaults || {});
+  profile.light_groups = (profile.light_groups || []).map((group, idx) => ({
+    id: group.id || `group_${idx + 1}`,
+    name: group.name || `Group ${idx + 1}`,
+    role: group.role || 'custom',
+    enabled: group.enabled !== false,
+    light_ids: (group.light_ids || []).map(String),
+    overrides: Object.assign({}, profile.profile_defaults, group.overrides || {})
+  }));
+  if (!profile.light_groups.length) {
+    profile.light_groups.push({
+      id: 'all_lights', name: 'All lights', role: 'main', enabled: true,
+      light_ids: lights.filter(light => light.id !== null && light.id !== '').map(light => String(light.id)),
+      overrides: Object.assign({}, profile.profile_defaults)
+    });
+  }
+}
+Object.entries(profiles).forEach(([key, profile]) => ensureProfileShape(profile, key));
+
+function csvToPalette(text) {
+  return String(text || '').split(',').map(item => item.trim()).filter(Boolean);
+}
+function paletteToCsv(arr) {
+  return (arr || []).join(', ');
+}
+function sanitizeProfileKey(name) {
+  return String(name || 'custom_profile').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_') || 'custom_profile';
+}
+function getCurrentProfile() {
+  if (!profiles[currentProfileKey]) {
+    currentProfileKey = Object.keys(profiles)[0];
+  }
+  return profiles[currentProfileKey];
+}
+function getCurrentGroup() {
+  const profile = getCurrentProfile();
+  if (!profile.light_groups.length) return null;
+  currentGroupIndex = Math.max(0, Math.min(currentGroupIndex, profile.light_groups.length - 1));
+  return profile.light_groups[currentGroupIndex];
+}
+function getCurrentPreset() {
+  if (!strobePresets.length) return null;
+  currentPresetIndex = Math.max(0, Math.min(currentPresetIndex, strobePresets.length - 1));
+  return strobePresets[currentPresetIndex];
+}
+
+function renderProfileList() {
+  const sel = document.getElementById('profile-select');
+  sel.innerHTML = '';
+  Object.entries(profiles).forEach(([key, profile]) => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = `${key}${profile.builtin ? ' · built-in' : ''}`;
+    if (key === currentProfileKey) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+function renderGroupList() {
+  const sel = document.getElementById('group-select');
+  const profile = getCurrentProfile();
+  sel.innerHTML = '';
+  profile.light_groups.forEach((group, idx) => {
+    const opt = document.createElement('option');
+    opt.value = idx;
+    opt.textContent = `${group.name} · ${group.role} · ${group.light_ids.length} lights`;
+    if (idx === currentGroupIndex) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+function renderPresetList() {
+  const sel = document.getElementById('preset-select');
+  sel.innerHTML = '';
+  strobePresets.forEach((preset, idx) => {
+    const opt = document.createElement('option');
+    opt.value = idx;
+    opt.textContent = `${preset.name} · ${preset.duration}s · ${preset.sync_mode}`;
+    if (idx === currentPresetIndex) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function fillProfileEditor() {
+  const profile = getCurrentProfile();
+  if (!profile) return;
+  const d = profile.profile_defaults;
+  document.getElementById('profile-name').value = profile.name || currentProfileKey;
+  document.getElementById('profile-description').value = profile.description || '';
+  document.getElementById('profile-render-mode').value = d.render_mode || 'hybrid';
+  document.getElementById('profile-intensity-mode').value = d.intensity_mode || 'adaptive';
+  document.getElementById('profile-grid-behavior').value = d.grid_behavior || 'adaptive';
+  document.getElementById('profile-palette').value = paletteToCsv(d.palette_colors);
+  document.getElementById('profile-palette-bias').value = d.palette_bias || 'mixed';
+  document.getElementById('profile-static-color').value = d.static_color || '';
+  document.getElementById('profile-base-brightness').value = d.base_brightness;
+  document.getElementById('profile-peak-brightness').value = d.peak_brightness;
+  document.getElementById('profile-attack').value = d.pulse_attack_ms;
+  document.getElementById('profile-hold').value = d.pulse_hold_ms;
+  document.getElementById('profile-decay').value = d.pulse_decay_ms;
+  document.getElementById('profile-pulse-mix').value = d.pulse_mix;
+  document.getElementById('profile-pulse-intensity').value = d.pulse_intensity;
+  document.getElementById('profile-color-motion').value = d.color_motion;
+  document.getElementById('profile-color-step').value = d.color_step_scale;
+  document.getElementById('profile-accent-every').value = d.accent_every_beats;
+  document.getElementById('profile-accent-multiplier').value = d.accent_multiplier;
+  document.getElementById('profile-group-activity').value = d.group_activity;
+  document.getElementById('profile-min-pulse').value = d.min_pulse_level;
+  document.getElementById('profile-max-pulse').value = d.max_pulse_level;
+  document.getElementById('profile-audio-gain').value = d.audio_intensity_gain;
+  document.getElementById('profile-audio-gate').value = d.audio_gate_threshold;
+}
+function fillGroupEditor() {
+  const group = getCurrentGroup();
+  const wrapper = document.getElementById('group-lights');
+  wrapper.innerHTML = '';
+  if (!group) return;
+  const o = group.overrides || {};
+  document.getElementById('group-name').value = group.name || '';
+  document.getElementById('group-role').value = group.role || 'custom';
+  document.getElementById('group-render-mode').value = o.render_mode || 'hybrid';
+  document.getElementById('group-intensity-mode').value = o.intensity_mode || 'adaptive';
+  document.getElementById('group-grid-behavior').value = o.grid_behavior || 'adaptive';
+  document.getElementById('group-palette').value = paletteToCsv(o.palette_colors);
+  document.getElementById('group-palette-bias').value = o.palette_bias || 'mixed';
+  document.getElementById('group-static-color').value = o.static_color || '';
+  document.getElementById('group-base').value = o.base_brightness;
+  document.getElementById('group-peak').value = o.peak_brightness;
+  document.getElementById('group-attack').value = o.pulse_attack_ms;
+  document.getElementById('group-hold').value = o.pulse_hold_ms;
+  document.getElementById('group-decay').value = o.pulse_decay_ms;
+  document.getElementById('group-pulse-mix').value = o.pulse_mix;
+  document.getElementById('group-pulse-intensity').value = o.pulse_intensity;
+  document.getElementById('group-color-motion').value = o.color_motion;
+  document.getElementById('group-color-step').value = o.color_step_scale;
+  document.getElementById('group-activity').value = o.group_activity;
+  document.getElementById('group-accent-every').value = o.accent_every_beats;
+  document.getElementById('group-accent-multiplier').value = o.accent_multiplier;
+  document.getElementById('group-min-pulse').value = o.min_pulse_level;
+  document.getElementById('group-max-pulse').value = o.max_pulse_level;
+  document.getElementById('group-audio-gain').value = o.audio_intensity_gain;
+  document.getElementById('group-audio-gate').value = o.audio_gate_threshold;
+  lights.forEach(light => {
+    const lid = light.id === null ? '' : String(light.id);
+    if (!lid) return;
+    const label = document.createElement('label');
+    label.className = 'subcard';
+    const checked = group.light_ids.includes(lid) ? 'checked' : '';
+    label.innerHTML = `<div class="row"><input type="checkbox" value="${lid}" ${checked}><div><strong>${light.name}</strong><div class="tiny">ID ${lid}${light.allowed_colors ? ' · ' + light.allowed_colors.join(', ') : ''}</div></div></div>`;
+    label.querySelector('input').addEventListener('change', persistGroupEditor);
+    wrapper.appendChild(label);
+  });
+}
+function fillPresetEditor() {
+  const preset = getCurrentPreset();
+  if (!preset) return;
+  document.getElementById('preset-name').value = preset.name || '';
+  document.getElementById('preset-duration').value = preset.duration;
+  document.getElementById('preset-on').value = preset.on_ms;
+  document.getElementById('preset-off').value = preset.off_ms;
+  document.getElementById('preset-sync').value = preset.sync_mode || 'free';
+}
+
+function persistProfileEditor(rename = true) {
+  const profile = getCurrentProfile();
+  if (!profile) return;
+  const oldKey = currentProfileKey;
+  const newKey = sanitizeProfileKey(document.getElementById('profile-name').value || oldKey);
+  profile.name = document.getElementById('profile-name').value || newKey;
+  profile.description = document.getElementById('profile-description').value || '';
+  Object.assign(profile.profile_defaults, {
+    render_mode: document.getElementById('profile-render-mode').value,
+    intensity_mode: document.getElementById('profile-intensity-mode').value,
+    grid_behavior: document.getElementById('profile-grid-behavior').value,
+    palette_colors: csvToPalette(document.getElementById('profile-palette').value),
+    palette_bias: document.getElementById('profile-palette-bias').value,
+    static_color: document.getElementById('profile-static-color').value.trim(),
+    base_brightness: Number(document.getElementById('profile-base-brightness').value || 110),
+    peak_brightness: Number(document.getElementById('profile-peak-brightness').value || 170),
+    pulse_attack_ms: Number(document.getElementById('profile-attack').value || 80),
+    pulse_hold_ms: Number(document.getElementById('profile-hold').value || 120),
+    pulse_decay_ms: Number(document.getElementById('profile-decay').value || 260),
+    pulse_mix: Number(document.getElementById('profile-pulse-mix').value || 0.45),
+    pulse_intensity: Number(document.getElementById('profile-pulse-intensity').value || 0.7),
+    color_motion: Number(document.getElementById('profile-color-motion').value || 0.35),
+    color_step_scale: Number(document.getElementById('profile-color-step').value || 0.5),
+    accent_every_beats: Number(document.getElementById('profile-accent-every').value || 4),
+    accent_multiplier: Number(document.getElementById('profile-accent-multiplier').value || 1.08),
+    group_activity: Number(document.getElementById('profile-group-activity').value || 1.0),
+    min_pulse_level: Number(document.getElementById('profile-min-pulse').value || 0.18),
+    max_pulse_level: Number(document.getElementById('profile-max-pulse').value || 1.0),
+    audio_intensity_gain: Number(document.getElementById('profile-audio-gain').value || 1.0),
+    audio_gate_threshold: Number(document.getElementById('profile-audio-gate').value || 0.12)
+  });
+  if (rename && newKey !== oldKey) {
+    profiles[newKey] = profile;
+    delete profiles[oldKey];
+    currentProfileKey = newKey;
+  }
+  renderAll();
+}
+function persistGroupEditor() {
+  const group = getCurrentGroup();
+  if (!group) return;
+  group.name = document.getElementById('group-name').value || group.name;
+  group.role = document.getElementById('group-role').value || 'custom';
+  Object.assign(group.overrides, {
+    render_mode: document.getElementById('group-render-mode').value,
+    intensity_mode: document.getElementById('group-intensity-mode').value,
+    grid_behavior: document.getElementById('group-grid-behavior').value,
+    palette_colors: csvToPalette(document.getElementById('group-palette').value),
+    palette_bias: document.getElementById('group-palette-bias').value,
+    static_color: document.getElementById('group-static-color').value.trim(),
+    base_brightness: Number(document.getElementById('group-base').value || 110),
+    peak_brightness: Number(document.getElementById('group-peak').value || 170),
+    pulse_attack_ms: Number(document.getElementById('group-attack').value || 80),
+    pulse_hold_ms: Number(document.getElementById('group-hold').value || 120),
+    pulse_decay_ms: Number(document.getElementById('group-decay').value || 260),
+    pulse_mix: Number(document.getElementById('group-pulse-mix').value || 0.45),
+    pulse_intensity: Number(document.getElementById('group-pulse-intensity').value || 0.7),
+    color_motion: Number(document.getElementById('group-color-motion').value || 0.35),
+    color_step_scale: Number(document.getElementById('group-color-step').value || 0.5),
+    group_activity: Number(document.getElementById('group-activity').value || 1.0),
+    accent_every_beats: Number(document.getElementById('group-accent-every').value || 4),
+    accent_multiplier: Number(document.getElementById('group-accent-multiplier').value || 1.08),
+    min_pulse_level: Number(document.getElementById('group-min-pulse').value || 0.18),
+    max_pulse_level: Number(document.getElementById('group-max-pulse').value || 1.0),
+    audio_intensity_gain: Number(document.getElementById('group-audio-gain').value || 1.0),
+    audio_gate_threshold: Number(document.getElementById('group-audio-gate').value || 0.12)
+  });
+  group.light_ids = Array.from(document.querySelectorAll('#group-lights input[type=checkbox]:checked')).map(el => el.value);
+  renderAll();
+}
+function persistPresetEditor() {
+  const preset = getCurrentPreset();
+  if (!preset) return;
+  preset.name = document.getElementById('preset-name').value || preset.name;
+  preset.duration = Number(document.getElementById('preset-duration').value || 3);
+  preset.on_ms = Number(document.getElementById('preset-on').value || 20);
+  preset.off_ms = Number(document.getElementById('preset-off').value || 80);
+  preset.sync_mode = document.getElementById('preset-sync').value || 'free';
+  renderAll();
+}
+
+function ensureNoDuplicateLightAssignments() {
+  const profile = getCurrentProfile();
+  const seen = new Set();
+  profile.light_groups.forEach(group => {
+    group.light_ids = (group.light_ids || []).filter(lid => {
+      if (seen.has(lid)) return false;
+      seen.add(lid);
+      return true;
+    });
+  });
+}
+function validateProfiles() {
+  const messages = [];
+  Object.entries(profiles).forEach(([key, profile]) => {
+    const used = new Map();
+    const assigned = new Set();
+    const groups = profile.light_groups || [];
+    if (!groups.length) {
+      messages.push(`Profile "${profile.name || key}" has no light groups.`);
+      return;
+    }
+    groups.forEach(group => {
+      if (!group.light_ids || !group.light_ids.length) {
+      }
+      (group.light_ids || []).forEach(lid => {
+        if (used.has(lid)) messages.push(`Profile "${profile.name || key}" assigns light ${lid} to both "${used.get(lid)}" and "${group.name}".`);
+        used.set(lid, group.name);
+        assigned.add(String(lid));
+      });
+    });
+  });
+  const box = document.getElementById('profile-validation');
+  if (!box) return messages;
+  if (messages.length) {
+    box.innerHTML = '<strong>Needs attention</strong><br>' + messages.map(m => `• ${m}`).join('<br>');
+  } else {
+    box.innerHTML = '<strong>Looks good</strong><br>Profiles have no duplicate light assignments. Leaving some lights unused is allowed.';
+  }
+  return messages;
+}
+
+function syncHiddenFields() {
+  Object.entries(profiles).forEach(([key, profile]) => ensureProfileShape(profile, key));
+  ensureNoDuplicateLightAssignments();
+  validateProfiles();
+  document.getElementById('active_profile_field').value = currentProfileKey;
+  document.getElementById('profiles_json').value = JSON.stringify(profiles);
+  document.getElementById('strobe_presets_json').value = JSON.stringify(strobePresets);
+  document.getElementById('profiles-json-preview').value = JSON.stringify(profiles, null, 2);
+  document.getElementById('presets-json-preview').value = JSON.stringify(strobePresets, null, 2);
+}
+function renderAll() {
+  renderProfileList();
+  fillProfileEditor();
+  renderGroupList();
+  fillGroupEditor();
+  renderPresetList();
+  fillPresetEditor();
+  syncHiddenFields();
+}
+
+function addProfile() {
+  let base = 'custom_profile';
+  let idx = 1;
+  while (profiles[base]) base = `custom_profile_${idx++}`;
+  profiles[base] = { name: base, builtin: false, description: 'Custom profile', profile_defaults: Object.assign({}, defaultProfileDefaults), light_groups: [{ id: 'all_lights', name: 'All lights', role: 'main', enabled: true, light_ids: lights.filter(light => light.id !== null && light.id !== '').map(light => String(light.id)), overrides: Object.assign({}, defaultProfileDefaults) }] };
+  currentProfileKey = base;
+  currentGroupIndex = 0;
+  renderAll();
+}
+function copyProfile() {
+  const current = JSON.parse(JSON.stringify(getCurrentProfile()));
+  let base = `${sanitizeProfileKey(current.name)}_copy`;
+  let idx = 1;
+  while (profiles[base]) base = `${sanitizeProfileKey(current.name)}_copy_${idx++}`;
+  current.name = base;
+  current.builtin = false;
+  profiles[base] = current;
+  currentProfileKey = base;
+  currentGroupIndex = 0;
+  renderAll();
+}
+function deleteProfile() {
+  if (Object.keys(profiles).length <= 1) return;
+  delete profiles[currentProfileKey];
+  currentProfileKey = Object.keys(profiles)[0];
+  currentGroupIndex = 0;
+  renderAll();
+}
+function addGroup() {
+  const profile = getCurrentProfile();
+  profile.light_groups.push({ id: `group_${profile.light_groups.length + 1}`, name: `Group ${profile.light_groups.length + 1}`, role: 'custom', enabled: true, light_ids: [], overrides: Object.assign({}, profile.profile_defaults) });
+  currentGroupIndex = profile.light_groups.length - 1;
+  renderAll();
+}
+function duplicateGroup() {
+  const profile = getCurrentProfile();
+  const current = getCurrentGroup();
+  if (!current) return;
+  const copy = JSON.parse(JSON.stringify(current));
+  copy.id = `${copy.id}_copy_${profile.light_groups.length + 1}`;
+  copy.name = `${copy.name} copy`;
+  profile.light_groups.push(copy);
+  currentGroupIndex = profile.light_groups.length - 1;
+  renderAll();
+}
+function deleteGroup() {
+  const profile = getCurrentProfile();
+  if (profile.light_groups.length <= 1) return;
+  profile.light_groups.splice(currentGroupIndex, 1);
+  currentGroupIndex = Math.max(0, currentGroupIndex - 1);
+  renderAll();
+}
+function addPreset() {
+  strobePresets.push({ name: `Preset ${strobePresets.length + 1}`, duration: 3, on_ms: 20, off_ms: 80, sync_mode: 'free' });
+  currentPresetIndex = strobePresets.length - 1;
+  renderAll();
+}
+function deletePreset() {
+  if (!strobePresets.length) return;
+  strobePresets.splice(currentPresetIndex, 1);
+  if (!strobePresets.length) strobePresets.push({ name: 'Quick strobe', duration: 3, on_ms: 20, off_ms: 80, sync_mode: 'free' });
+  currentPresetIndex = Math.max(0, currentPresetIndex - 1);
+  renderAll();
+}
+
+document.getElementById('profile-select').addEventListener('change', e => { currentProfileKey = e.target.value; currentGroupIndex = 0; renderAll(); });
+document.getElementById('group-select').addEventListener('change', e => { currentGroupIndex = Number(e.target.value || 0); renderAll(); });
+document.getElementById('preset-select').addEventListener('change', e => { currentPresetIndex = Number(e.target.value || 0); renderAll(); });
+document.getElementById('profile-name').addEventListener('change', () => persistProfileEditor(true));
+['profile-description','profile-render-mode','profile-intensity-mode','profile-grid-behavior','profile-palette','profile-palette-bias','profile-static-color','profile-base-brightness','profile-peak-brightness','profile-attack','profile-hold','profile-decay','profile-pulse-mix','profile-pulse-intensity','profile-color-motion','profile-color-step','profile-accent-every','profile-accent-multiplier','profile-group-activity','profile-min-pulse','profile-max-pulse','profile-audio-gain','profile-audio-gate'].forEach(id => document.getElementById(id).addEventListener('input', () => persistProfileEditor(id !== 'profile-name')));
+['group-name','group-role','group-render-mode','group-intensity-mode','group-grid-behavior','group-palette','group-palette-bias','group-static-color','group-base','group-peak','group-attack','group-hold','group-decay','group-pulse-mix','group-pulse-intensity','group-color-motion','group-color-step','group-activity','group-accent-every','group-accent-multiplier','group-min-pulse','group-max-pulse','group-audio-gain','group-audio-gate'].forEach(id => document.getElementById(id).addEventListener('input', persistGroupEditor));
+['preset-name','preset-duration','preset-on','preset-off','preset-sync'].forEach(id => document.getElementById(id).addEventListener('input', persistPresetEditor));
+document.getElementById('add-profile-btn').addEventListener('click', addProfile);
+document.getElementById('copy-profile-btn').addEventListener('click', copyProfile);
+document.getElementById('delete-profile-btn').addEventListener('click', deleteProfile);
+document.getElementById('add-group-btn').addEventListener('click', addGroup);
+document.getElementById('duplicate-group-btn').addEventListener('click', duplicateGroup);
+document.getElementById('delete-group-btn').addEventListener('click', deleteGroup);
+document.getElementById('add-preset-btn').addEventListener('click', addPreset);
+document.getElementById('delete-preset-btn').addEventListener('click', deletePreset);
+document.getElementById('admin-form').addEventListener('submit', (e) => { syncHiddenFields(); const messages = validateProfiles(); if (messages.length) { e.preventDefault(); alert(`Please fix the profile issues before saving:
+
+${messages.join('\n')}`); } });
+renderAll();
+</script>
+{% endblock %}

@@ -1,0 +1,4 @@
+--- groups_tbl ---
+(1, 'Hue Disco Area', '["2", "3", "4"]')
+--- entertainment_areas ---
+('1', 'Hue Disco Area', 1, '38efb94a366e11f1aa59dca63255b293', '[{"light_id":"2","x":0.0,"y":0.0,"z":0.0},{"light_id":"3","x":1.0,"y":0.0,"z":0.0},{"light_id":"4","x":2.0,"y":0.0,"z":0.0}]')

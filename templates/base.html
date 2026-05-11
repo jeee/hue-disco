@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Hue Disco Club</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b0d14;--card:#15192a;--muted:#9aa7d3;--border:#2c3352;--accent:#7c3aed;--accent2:#06b6d4;--ok:#22c55e;--warn:#f59e0b;--danger:#ef4444}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,Arial,sans-serif;background:linear-gradient(180deg,#0a0b10,#101522);color:#eef2ff}
+    .container{max-width:1280px;margin:0 auto;padding:20px}
+    .header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+    .title{font-size:1.5rem;font-weight:800}
+    .subtitle{color:var(--muted)}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:18px;box-shadow:0 14px 34px rgba(0,0,0,.24);margin-bottom:16px}
+    .metric{font-size:1.45rem;font-weight:800}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+    .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+    .small{color:var(--muted);font-size:.95rem;line-height:1.42}
+    .tiny{color:var(--muted);font-size:.86rem;line-height:1.35}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .stack{display:flex;flex-direction:column;gap:10px}
+    input,select,textarea{width:100%;padding:10px 12px;border-radius:12px;border:1px solid #394163;background:#0f1322;color:#fff;font:inherit}
+    input[type=checkbox]{width:auto;transform:scale(1.15)}
+    label{display:block;margin:10px 0 6px;color:#d9e0ff;font-weight:600}
+    textarea{min-height:120px;resize:vertical}
+    button,.btn{padding:11px 15px;border-radius:12px;border:0;font-weight:800;cursor:pointer;text-decoration:none;display:inline-block;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+    .btn.secondary,button.secondary{background:#27304d;color:#eef2ff}
+    .btn.warn,button.warn{background:#4b3a10;color:#ffd88a}
+    .btn.danger,button.danger{background:#4b1d23;color:#ffb3bf}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#1d2440;border:1px solid #2d3a64;color:#dbe6ff;font-size:.84rem}
+    .ok{color:#9ef0b2}.warn-text{color:#ffd88a}.error{color:#ffb4bf}
+    .section-title{font-size:1.04rem;font-weight:800;margin:0 0 6px 0}
+    .subcard{background:#0e1220;border:1px solid #28304b;border-radius:16px;padding:14px}
+    .list-reset{list-style:none;padding:0;margin:0}
+    .help{padding:10px 12px;border-radius:14px;background:#10172b;border:1px solid #2e3a61;color:#d8e3ff}
+.help strong{display:block;margin-bottom:4px}
+    .info-tip{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;margin-left:6px;border-radius:999px;border:1px solid #51618f;color:#cdd8ff;font-size:.74rem;cursor:help;position:relative;vertical-align:middle}
+    .info-tip:hover::after,.info-tip:focus-visible::after{content:attr(data-tip);position:absolute;left:50%;bottom:125%;transform:translateX(-50%);width:240px;padding:8px 10px;border-radius:10px;background:#0b1120;border:1px solid #334269;color:#eef2ff;font-size:.8rem;line-height:1.35;white-space:normal;box-shadow:0 12px 30px rgba(0,0,0,.35);z-index:50}
+    .divider{height:1px;background:#26314e;margin:12px 0}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <div class="title">Hue Disco Club</div>
+        <div class="subtitle">Shared beat timing, profile-based rendering, diyHue entertainment streaming</div>
+      </div>
+      <div class="row">
+        {% block header_actions %}{% endblock %}
+      </div>
+    </div>
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

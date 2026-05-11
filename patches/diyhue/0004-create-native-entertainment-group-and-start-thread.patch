@@ -1,0 +1,66 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenAI <noreply@example.com>
+Date: Thu, 16 Apr 2026 00:00:00 +0000
+Subject: [PATCH] Create native entertainment group object and start diyHue thread
+
+When MG21 native group actions reach the monkeypatched native path, diyHue
+may still be missing a local EntertainmentConfiguration object for the same
+group id. In that case stream activation returns success but no local
+entertainmentService thread is started, so UDP 2100 never opens and DTLS
+clients get connection refused.
+
+This patch makes the native group action path synthesize the diyHue
+EntertainmentConfiguration from native state when needed, populate lights and
+locations, update stream state, and only start entertainmentService on the
+inactive->active transition.
+---
+ flaskUI/restful.py | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+), 0 deletions(-)
+
+diff --git a/flaskUI/restful.py b/flaskUI/restful.py
+index fedcba9..0123456 100644
+--- a/flaskUI/restful.py
++++ b/flaskUI/restful.py
+@@ -626,10 +626,43 @@ class ElementParam(Resource):
+                  handle_group_action_sync(_mg21_cfg_path, resourceid, putDict, controller_id=username)
+                  if "stream" in putDict and "active" in putDict["stream"]:
++                     active = bool(putDict["stream"]["active"])
++                     native_group = _mg21_native_groups().get(str(resourceid)) or {}
+                      group = bridgeConfig.get("groups", {}).get(resourceid)
+-                     active = bool(putDict["stream"]["active"])
+-                     if group is not None and hasattr(group, "stream"):
++                     if group is None and native_group:
++                         data = {
++                             "id_v1": str(resourceid),
++                             "name": native_group.get("name", f"Group {resourceid}"),
++                             "type": native_group.get("type", "Entertainment"),
++                             "configuration_type": native_group.get("configuration_type", "screen"),
++                         }
++                         group = EntertainmentConfiguration.EntertainmentConfiguration(data)
++                         bridgeConfig.setdefault("groups", {})[str(resourceid)] = group
++                         for lid in (native_group.get("lights") or []):
++                             light_obj = bridgeConfig.get("lights", {}).get(str(lid))
++                             if light_obj is not None:
++                                 group.add_light(light_obj)
++                         for lid, loc in (native_group.get("locations") or {}).items():
++                             light_obj = bridgeConfig.get("lights", {}).get(str(lid))
++                             if light_obj is not None and isinstance(loc, list) and len(loc) >= 3:
++                                 group.locations[light_obj] = [{"x": loc[0], "y": loc[1], "z": loc[2]}]
++                     if group is not None:
++                         if not hasattr(group, "stream") or group.stream is None:
++                             group.stream = {}
++                         was_active = bool(group.stream.get("active"))
+                          group.stream["active"] = active
+                          group.stream["owner"] = username if active else None
+                          group.stream["proxymode"] = "auto"
+                          group.stream["proxynode"] = "/bridge"
++                         if active and not was_active:
++                             logging.info("start hue entertainment")
++                             Thread(target=entertainmentService, args=[group, bridgeConfig["apiUsers"][username]], daemon=True).start()
++                         elif not active:
++                             logging.info("stop hue entertainent")
++                             Popen(["killall", "openssl"])
+                      return [{"success": {f"/groups/{resourceid}/action/stream": {"active": active}}}]
+                  return [{"success": {f"/groups/{resourceid}/action": putDict}}]
+ -- 
+2.39.5

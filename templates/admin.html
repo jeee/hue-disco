@@ -460,7 +460,7 @@ function renderPaletteEditor(editorId, inputId, persistFn) {
     const chip = document.createElement('span');
     chip.className = 'color-chip';
     chip.style.setProperty('--chip-color', color);
-    chip.innerHTML = `<span class="color-dot"></span><input type="color" value="${color}" title="Change color"><input type="text" class="mono" value="${color}" title="Hex color"><button type="button" title="Remove color">×</button>`;
+    chip.innerHTML = `<input type="color" value="${color}" title="Change color"><input type="text" class="mono" value="${color}" title="Hex color"><button type="button" title="Remove color">×</button>`;
     const chipPicker = chip.querySelector('input[type=color]');
     const chipText = chip.querySelector('input[type=text]');
     const setColor = (value) => {

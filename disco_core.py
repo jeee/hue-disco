@@ -505,10 +505,13 @@ class DiscoEngine:
     def _make_profile_payload(self, audio_metrics, now=None):
         now = now or time.time()
         profile_defaults, groups = self._build_profile_groups()
+        chase_indices = [idx for idx, group in enumerate(groups) if str(group['settings'].get('render_mode') or '').lower() == 'beat_chase']
+        active_chase_idx = chase_indices[self.state.beat_count % len(chase_indices)] if chase_indices else None
         payload = []
         for idx, group in enumerate(groups):
             settings = group['settings']
             render_mode = str(settings.get('render_mode') or self.cfg.get('render_mode', 'hybrid'))
+            chase_active = render_mode == 'beat_chase' and (idx == active_chase_idx)
             base_brightness = max(0.0, min(255.0, float(settings.get('base_brightness', profile_defaults.get('base_brightness', 110)))))
             peak_brightness = max(base_brightness, min(255.0, float(settings.get('peak_brightness', profile_defaults.get('peak_brightness', 170)))))
             pulse_mix = max(0.0, min(1.0, float(settings.get('pulse_mix', profile_defaults.get('pulse_mix', 0.45)))))
@@ -526,15 +529,18 @@ class DiscoEngine:
                 color_rgb = self._group_color(idx, light, settings, profile_defaults)
                 base_rgb = self._apply_brightness(color_rgb, base_brightness)
                 dynamic_brightness = base_brightness + ((peak_brightness - base_brightness) * min(1.0, pulse_strength))
-                if render_mode == 'color_only':
+                if render_mode == 'beat_chase' and not chase_active:
+                    off_pct = max(0.0, min(100.0, float(settings.get('chase_off_brightness', profile_defaults.get('chase_off_brightness', 0.0))))) / 100.0
+                    final_rgb = self._apply_brightness(color_rgb, base_brightness * off_pct)
+                elif render_mode == 'color_only':
                     final_rgb = self._apply_brightness(color_rgb, max(base_brightness, peak_brightness * 0.75))
                 elif render_mode == 'pulse_only':
                     mono = int(max(0, min(255, dynamic_brightness)))
                     final_rgb = (mono, mono, mono)
                 else:
                     pulse_white = self._apply_brightness((255, 255, 255), dynamic_brightness * pulse_mix * max(0.2, pulse_strength))
-                    color_layer_strength = 1.0 if render_mode == 'hybrid' else 0.0
-                    if render_mode == 'hybrid':
+                    color_layer_strength = 1.0 if render_mode in {'hybrid', 'beat_chase'} else 0.0
+                    if render_mode in {'hybrid', 'beat_chase'}:
                         color_layer_strength = max(0.2, 1.0 - (pulse_mix * 0.45))
                     color_layer = self._apply_brightness(base_rgb, dynamic_brightness * color_layer_strength)
                     final_rgb = tuple(min(255, color_layer[i] + pulse_white[i]) for i in range(3))

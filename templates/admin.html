@@ -220,7 +220,7 @@
             <div><label>Description</label><input id="profile-description"></div>
           </div>
           <div class="grid">
-            <div><label>Default render mode</label><select id="profile-render-mode"><option>hybrid</option><option>color_only</option><option>pulse_only</option><option>calibration</option></select></div>
+            <div><label>Default render mode</label><select id="profile-render-mode"><option>hybrid</option><option>color_only</option><option>pulse_only</option><option>beat_chase</option><option>calibration</option></select></div>
             <div><label>Default intensity mode</label><select id="profile-intensity-mode"><option>adaptive</option><option>audio</option><option>fixed</option></select></div>
             <div><label>Default grid behavior</label><select id="profile-grid-behavior"><option>adaptive</option><option>gated</option><option>continuous</option></select></div>
             <div>
@@ -252,6 +252,7 @@
             <div><label>Max pulse level</label><input id="profile-max-pulse"></div>
             <div><label>Audio gain</label><input id="profile-audio-gain"></div>
             <div><label>Audio gate</label><input id="profile-audio-gate"></div>
+            <div><label>Beat chase off %</label><input id="profile-chase-off"></div>
           </div>
         </div>
 
@@ -276,7 +277,7 @@
               <div class="grid">
                 <div><label>Group name</label><input id="group-name"></div>
                 <div><label>Role</label><select id="group-role"><option>custom</option><option>ambient</option><option>main</option><option>accent</option><option>background</option><option>percussive</option><option>melodic</option></select></div>
-                <div><label>Render mode <span class="info-tip" tabindex="0" data-tip="Hybrid is the normal music mode. Calibration is only for timing tests. Color only reduces beat pulsing; pulse only reduces color motion.">i</span></label><select id="group-render-mode"><option>hybrid</option><option>color_only</option><option>pulse_only</option><option>calibration</option></select></div>
+                <div><label>Render mode <span class="info-tip" tabindex="0" data-tip="Hybrid is the normal music mode. Beat chase cycles one beat-chase group on per beat while other beat-chase groups go to the configured off percentage. Calibration is only for timing tests.">i</span></label><select id="group-render-mode"><option>hybrid</option><option>color_only</option><option>pulse_only</option><option>beat_chase</option><option>calibration</option></select></div>
                 <div><label>Intensity mode <span class="info-tip" tabindex="0" data-tip="Fixed gives every pulse the same strength. Audio follows current signal strength. Adaptive keeps a base pulse but grows stronger on stronger musical moments.">i</span></label><select id="group-intensity-mode"><option>adaptive</option><option>audio</option><option>fixed</option></select></div>
                 <div><label>Grid behavior <span class="info-tip" tabindex="0" data-tip="Continuous always pulses on the beat grid. Gated only pulses when current audio supports it. Adaptive scales pulse strength with the audio.">i</span></label><select id="group-grid-behavior"><option>adaptive</option><option>gated</option><option>continuous</option></select></div>
                 <div>
@@ -305,8 +306,9 @@
                 <div><label>Max pulse</label><input id="group-max-pulse"></div>
                 <div><label>Audio gain</label><input id="group-audio-gain"></div>
                 <div><label>Audio gate</label><input id="group-audio-gate"></div>
+                <div><label>Beat chase off %</label><input id="group-chase-off"></div>
               </div>
-              <div class="help"><strong>Group design tip</strong> Use groups for behavior, not for independent timing. Ambient groups usually want lower activity, lower pulse mix, softer envelopes and warmer palettes. Accent or percussive groups can use stronger pulse intensity, brighter peaks and faster attacks.</div>
+              <div class="help"><strong>Group design tip</strong> Use groups for behavior. For a ceiling chase, split the 20 spots into 4 groups, set those groups to <span class="mono">beat_chase</span>, and set Beat chase off % to 0 for true off or e.g. 10–20 for a dim glow. Groups not set to beat_chase keep rendering normally.</div>
               <div>
                 <label>Lights in this group</label>
                 <div id="group-lights" class="grid"></div>
@@ -398,7 +400,8 @@ const defaultProfileDefaults = {
   base_brightness: 110, peak_brightness: 170, pulse_attack_ms: 80, pulse_hold_ms: 120, pulse_decay_ms: 260,
   pulse_mix: 0.45, pulse_intensity: 0.7, color_motion: 0.35, color_step_scale: 0.5, change_every_beats: 1,
   beat_subdivision: 1, accent_every_beats: 4, accent_multiplier: 1.08, min_pulse_level: 0.18, max_pulse_level: 1.0,
-  audio_intensity_gain: 1.0, audio_gate_threshold: 0.12, group_activity: 1.0, palette_colors: [], palette_bias: 'mixed', static_color: ''
+  audio_intensity_gain: 1.0, audio_gate_threshold: 0.12, group_activity: 1.0, palette_colors: [], palette_bias: 'mixed', static_color: '',
+  chase_off_brightness: 0
 };
 
 let profiles = JSON.parse(JSON.stringify(initialProfiles));
@@ -594,6 +597,7 @@ function fillProfileEditor() {
   document.getElementById('profile-max-pulse').value = d.max_pulse_level;
   document.getElementById('profile-audio-gain').value = d.audio_intensity_gain;
   document.getElementById('profile-audio-gate').value = d.audio_gate_threshold;
+  document.getElementById('profile-chase-off').value = d.chase_off_brightness ?? 0;
 }
 function fillGroupEditor() {
   const group = getCurrentGroup();
@@ -627,6 +631,7 @@ function fillGroupEditor() {
   document.getElementById('group-max-pulse').value = o.max_pulse_level;
   document.getElementById('group-audio-gain').value = o.audio_intensity_gain;
   document.getElementById('group-audio-gate').value = o.audio_gate_threshold;
+  document.getElementById('group-chase-off').value = o.chase_off_brightness ?? 0;
   lights.forEach(light => {
     const lid = light.id === null ? '' : String(light.id);
     if (!lid) return;
@@ -677,7 +682,8 @@ function persistProfileEditor(rename = true) {
     min_pulse_level: Number(document.getElementById('profile-min-pulse').value || 0.18),
     max_pulse_level: Number(document.getElementById('profile-max-pulse').value || 1.0),
     audio_intensity_gain: Number(document.getElementById('profile-audio-gain').value || 1.0),
-    audio_gate_threshold: Number(document.getElementById('profile-audio-gate').value || 0.12)
+    audio_gate_threshold: Number(document.getElementById('profile-audio-gate').value || 0.12),
+    chase_off_brightness: Number(document.getElementById('profile-chase-off').value || 0)
   });
   if (rename && newKey !== oldKey) {
     profiles[newKey] = profile;
@@ -713,7 +719,8 @@ function persistGroupEditor() {
     min_pulse_level: Number(document.getElementById('group-min-pulse').value || 0.18),
     max_pulse_level: Number(document.getElementById('group-max-pulse').value || 1.0),
     audio_intensity_gain: Number(document.getElementById('group-audio-gain').value || 1.0),
-    audio_gate_threshold: Number(document.getElementById('group-audio-gate').value || 0.12)
+    audio_gate_threshold: Number(document.getElementById('group-audio-gate').value || 0.12),
+    chase_off_brightness: Number(document.getElementById('group-chase-off').value || 0)
   });
   group.light_ids = Array.from(document.querySelectorAll('#group-lights input[type=checkbox]:checked')).map(el => el.value);
   renderAll();
@@ -859,8 +866,8 @@ document.getElementById('profile-select').addEventListener('change', e => { curr
 document.getElementById('group-select').addEventListener('change', e => { currentGroupIndex = Number(e.target.value || 0); renderAll(); });
 document.getElementById('preset-select').addEventListener('change', e => { currentPresetIndex = Number(e.target.value || 0); renderAll(); });
 document.getElementById('profile-name').addEventListener('change', () => persistProfileEditor(true));
-['profile-description','profile-render-mode','profile-intensity-mode','profile-grid-behavior','profile-palette','profile-palette-bias','profile-static-color','profile-base-brightness','profile-peak-brightness','profile-attack','profile-hold','profile-decay','profile-pulse-mix','profile-pulse-intensity','profile-color-motion','profile-color-step','profile-accent-every','profile-accent-multiplier','profile-group-activity','profile-min-pulse','profile-max-pulse','profile-audio-gain','profile-audio-gate'].forEach(id => document.getElementById(id).addEventListener('input', () => persistProfileEditor(id !== 'profile-name')));
-['group-name','group-role','group-render-mode','group-intensity-mode','group-grid-behavior','group-palette','group-palette-bias','group-static-color','group-base','group-peak','group-attack','group-hold','group-decay','group-pulse-mix','group-pulse-intensity','group-color-motion','group-color-step','group-activity','group-accent-every','group-accent-multiplier','group-min-pulse','group-max-pulse','group-audio-gain','group-audio-gate'].forEach(id => document.getElementById(id).addEventListener('input', persistGroupEditor));
+['profile-description','profile-render-mode','profile-intensity-mode','profile-grid-behavior','profile-palette','profile-palette-bias','profile-static-color','profile-base-brightness','profile-peak-brightness','profile-attack','profile-hold','profile-decay','profile-pulse-mix','profile-pulse-intensity','profile-color-motion','profile-color-step','profile-accent-every','profile-accent-multiplier','profile-group-activity','profile-min-pulse','profile-max-pulse','profile-audio-gain','profile-audio-gate','profile-chase-off'].forEach(id => document.getElementById(id).addEventListener('input', () => persistProfileEditor(id !== 'profile-name')));
+['group-name','group-role','group-render-mode','group-intensity-mode','group-grid-behavior','group-palette','group-palette-bias','group-static-color','group-base','group-peak','group-attack','group-hold','group-decay','group-pulse-mix','group-pulse-intensity','group-color-motion','group-color-step','group-activity','group-accent-every','group-accent-multiplier','group-min-pulse','group-max-pulse','group-audio-gain','group-audio-gate','group-chase-off'].forEach(id => document.getElementById(id).addEventListener('input', persistGroupEditor));
 document.getElementById('profile-static-color-picker').addEventListener('input', e => { document.getElementById('profile-static-color').value = e.target.value.toUpperCase(); persistProfileEditor(false); });
 document.getElementById('group-static-color-picker').addEventListener('input', e => { document.getElementById('group-static-color').value = e.target.value.toUpperCase(); persistGroupEditor(); });
 ['preset-name','preset-duration','preset-on','preset-off','preset-sync'].forEach(id => document.getElementById(id).addEventListener('input', persistPresetEditor));

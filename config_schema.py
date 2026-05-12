@@ -11,7 +11,7 @@ LEGACY_ROOT_KEYS = {
     'hue_step', 'strobe_seconds', 'audio_device'
 }
 
-VALID_RENDER_MODES = {'calibration', 'color_only', 'pulse_only', 'hybrid'}
+VALID_RENDER_MODES = {'calibration', 'color_only', 'pulse_only', 'hybrid', 'beat_chase'}
 VALID_INTENSITY_MODES = {'fixed', 'audio', 'adaptive'}
 VALID_GRID_BEHAVIORS = {'continuous', 'gated', 'adaptive'}
 VALID_GROUP_ROLES = {'ambient', 'main', 'accent', 'background', 'percussive', 'melodic', 'custom'}
@@ -85,6 +85,7 @@ def _profile_defaults_template():
         'palette_colors': [],
         'palette_bias': 'mixed',
         'static_color': '',
+        'chase_off_brightness': 0,
     }
 
 
@@ -196,6 +197,7 @@ def _normalize_profile_defaults(data):
     merged['audio_intensity_gain'] = _as_float(merged.get('audio_intensity_gain'), 1.0, 0.0, 5.0)
     merged['audio_gate_threshold'] = _as_float(merged.get('audio_gate_threshold'), 0.12, 0.0, 1.0)
     merged['group_activity'] = _as_float(merged.get('group_activity'), 1.0, 0.0, 2.0)
+    merged['chase_off_brightness'] = _as_float(merged.get('chase_off_brightness'), 0.0, 0.0, 100.0)
     merged['palette_colors'] = _normalize_palette(merged.get('palette_colors') or [])
     merged['palette_bias'] = str(merged.get('palette_bias') or 'mixed')
     static_color = str(merged.get('static_color') or '').strip()

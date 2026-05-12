@@ -445,6 +445,13 @@ class DiscoEngine:
         onset_score = max(0.0, min(1.0, float(audio_metrics.get('onset_score', 0.0))))
         return max(rms * 0.36, flux * 0.70, band_energy * 0.58, onset_score * 0.85)
 
+    def _has_live_audio(self, audio_metrics):
+        return (
+            float(audio_metrics.get('rms', 0.0) or 0.0) >= 0.012
+            or float(audio_metrics.get('flux', 0.0) or 0.0) >= 0.010
+            or float(audio_metrics.get('band_energy', 0.0) or 0.0) >= 0.10
+        )
+
     def _compute_intensity(self, settings, audio_metrics):
         mode = str(settings.get('intensity_mode') or self.cfg.get('intensity_mode', 'adaptive'))
         min_level = max(0.0, min(1.5, float(settings.get('min_pulse_level', self.cfg.get('min_pulse_level', 0.18)))))
@@ -464,6 +471,8 @@ class DiscoEngine:
         return max(0.0, min(1.5, intensity * activity))
 
     def _grid_allows_pulse(self, settings, audio_metrics):
+        if not self._has_live_audio(audio_metrics):
+            return False
         behavior = str(settings.get('grid_behavior') or self.cfg.get('grid_behavior', 'adaptive'))
         gate = max(0.0, float(settings.get('audio_gate_threshold', self.cfg.get('audio_gate_threshold', 0.12))))
         evidence = self._normalize_audio_strength(audio_metrics)
@@ -817,7 +826,7 @@ class DiscoEngine:
                     self.phase_period = 60.0 / float(update.bpm)
                     if self.phase_anchor <= 0.0:
                         self.phase_anchor = float(update.beat_time or update.peak_time or now)
-                if update.accepted_peak or update.beat_due:
+                if (update.accepted_peak or update.beat_due) and self._has_live_audio(metrics):
                     self._detector_forced_trigger = True
                     onset_score = max(onset_score, 1.35)
                     metrics['onset_score'] = max(metrics['onset_score'], 1.20)
@@ -869,12 +878,13 @@ class DiscoEngine:
                     current_flux = float(metrics.get('flux', 0.0) or 0.0)
                     current_band = float(metrics.get('band_energy', 0.0) or 0.0)
 
-                    strong_live_trigger = (
+                    has_live_audio = self._has_live_audio(metrics)
+                    strong_live_trigger = has_live_audio and (
                         onset_score_raw >= 1.0
                         and current_rms >= 0.006
                         and current_flux >= 0.010
                         and current_band >= 0.18
-                    ) or bool(getattr(self, '_detector_forced_trigger', False))
+                    ) or (has_live_audio and bool(getattr(self, '_detector_forced_trigger', False)))
 
                     if strong_live_trigger:
                         self._last_live_beat_evidence = predicted_now
@@ -984,7 +994,7 @@ class DiscoEngine:
                         self._next_phase_fire_at = 0.0
                         self._next_phase_fire_period = 0.0
 
-                    if render_mode != 'calibration' and self._should_emit_frame(now):
+                    if render_mode != 'calibration' and self._should_emit_frame(now) and (has_live_audio or render_source != 'frame'):
                         payload = self._make_profile_payload(metrics, now=now)
                         if payload:
                             self._emit_payload(payload, render_source, metrics)

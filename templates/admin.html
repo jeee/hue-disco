@@ -65,13 +65,16 @@
         <label>Bridge IP</label>
         <input name="bridge_ip" value="{{ state.bridge_ip }}">
       </div>
+      <div class="row">
+        <form method="post" action="/api/admin/bridge/rediscover" onsubmit="return confirm('Clear saved bridge credentials and search again?');"><button type="submit" class="secondary">Rediscover bridge</button></form>
+      </div>
       <div>
         <label>Entertainment group ID</label>
         <input name="entertainment_group_id" value="{{ state.entertainment_group_id }}">
       </div>
       <div class="help">
         <strong>When to edit these</strong>
-        For diyHue on the Pi, the bridge IP normally stays at 127.0.0.1. For a real Hue bridge, you can now leave Bridge IP blank to let bootstrap try automatic discovery on the local network. Change the entertainment group only if bootstrap or auto-discovery picked the wrong area, or if you intentionally created a different entertainment area.
+        For diyHue on the Pi, the bridge IP normally stays at 127.0.0.1. For a real Hue bridge, leave Bridge IP blank and use Rediscover bridge, or enter the bridge IP manually and Save. Rediscover clears stale bridge credentials because credentials from the wrong IP cannot be reused safely.
       </div>
     </div>
 

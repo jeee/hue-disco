@@ -12,7 +12,7 @@ from urllib.parse import quote_plus
 import json
 from waitress import serve
 
-from bootstrap_hue_credentials import bootstrap
+from bootstrap_hue_credentials import bootstrap, first_discovered_bridge_ip
 from disco_core import DiscoEngine
 from config_schema import export_settings_backup, import_settings_backup, load_config, parse_backup_payload, save_config
 from update_manager import UpdateManager
@@ -161,6 +161,28 @@ def create_app(config_path: str):
             return redirect('/admin?notice=' + quote_plus('Backup imported successfully. Review the settings and save again if you make further edits.'))
         except Exception as exc:
             return redirect('/admin?error=' + quote_plus(f'Backup import failed: {exc}'))
+
+    @app.post('/api/admin/bridge/rediscover')
+    @require_password('admin')
+    def api_admin_bridge_rediscover():
+        try:
+            cfg = load_config(config_path)
+            cfg['bridge_ip'] = ''
+            cfg['app_key'] = ''
+            cfg['client_key'] = ''
+            cfg['psk_identity'] = ''
+            cfg['entertainment_group_id'] = ''
+            discovered = first_discovered_bridge_ip(timeout=6)
+            if discovered:
+                cfg['bridge_ip'] = discovered
+            save_config(config_path, cfg)
+            engine.reload()
+            start_background_bootstrap(engine, config_path)
+            if discovered:
+                return redirect('/admin?notice=' + quote_plus(f'Bridge rediscovery found {discovered}. If this is a real Hue bridge, press its link button if pairing is requested.'))
+            return redirect('/admin?notice=' + quote_plus('Cleared stale bridge details. No bridge was discovered automatically; enter the Bridge IP manually and Save.'))
+        except Exception as exc:
+            return redirect('/admin?error=' + quote_plus(f'Bridge rediscovery failed: {exc}'))
 
     @app.post('/api/admin/update/check')
     @require_password('admin')

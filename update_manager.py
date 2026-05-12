@@ -45,6 +45,14 @@ def _short(commit: str) -> str:
     return (commit or '')[:10]
 
 
+def _commit_date(value: str) -> str:
+    try:
+        ts = int(value.strip())
+    except Exception:
+        return ''
+    return time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime(ts))
+
+
 class UpdateManager:
     def __init__(self, install_dir: str, source_dir: Optional[str] = None, branch: Optional[str] = None):
         self.install_dir = Path(install_dir).resolve()
@@ -97,6 +105,8 @@ class UpdateManager:
 
             local = self._git(['rev-parse', 'HEAD'])
             remote = self._git(['rev-parse', f'origin/{self.branch}'])
+            local_date = self._git(['show', '-s', '--format=%ct', 'HEAD'])
+            remote_date = self._git(['show', '-s', '--format=%ct', f'origin/{self.branch}'])
             if local.returncode != 0 or remote.returncode != 0:
                 status.update({'error': 'Could not read local or remote git revision.', 'available': False})
                 self._cached_status = status
@@ -112,6 +122,8 @@ class UpdateManager:
                 'remote_commit': remote_commit,
                 'local_short': _short(local_commit),
                 'remote_short': _short(remote_commit),
+                'local_date': _commit_date(local_date.stdout) if local_date.returncode == 0 else '',
+                'remote_date': _commit_date(remote_date.stdout) if remote_date.returncode == 0 else '',
                 'checked_at': int(now),
                 'error': '',
             })

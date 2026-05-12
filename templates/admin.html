@@ -39,7 +39,8 @@
       <div class="small">
         {% if update_status.enabled %}
           Source checkout: <span class="mono">{{ update_status.source_dir }}</span>. Branch: <span class="mono">{{ update_status.branch }}</span>.
-          {% if update_status.available %}New version available: <span class="mono">{{ update_status.local_short }}</span> → <span class="mono">{{ update_status.remote_short }}</span>.{% else %}No newer version detected.{% endif %}
+          Running code: <span class="mono">{{ update_status.local_short or 'unknown' }}</span>{% if update_status.local_date %}, published {{ update_status.local_date }}{% endif %}.
+          {% if update_status.available %}New version available: <span class="mono">{{ update_status.remote_short }}</span>{% if update_status.remote_date %}, published {{ update_status.remote_date }}{% endif %}.{% else %}No newer version detected.{% endif %}
         {% else %}
           Update source checkout is not available on this install.
         {% endif %}

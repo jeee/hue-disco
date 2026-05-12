@@ -70,7 +70,7 @@
     <div class="update-banner">
       <div>
         <strong>Update available</strong>
-        <span class="mono">{{ update_status.local_short }}</span> → <span class="mono">{{ update_status.remote_short }}</span>
+        <span class="mono">{{ update_status.local_short }}</span> → <span class="mono">{{ update_status.remote_short }}</span>{% if update_status.remote_date %} · {{ update_status.remote_date }}{% endif %}
       </div>
       <div class="update-actions">
         <form class="inline-form" method="post" action="/api/admin/update/check"><button class="secondary" type="submit">Recheck</button></form>

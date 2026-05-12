@@ -58,6 +58,9 @@ class UpdateManager:
         self._updating = False
         self._last_result: Dict = {}
 
+    def _git(self, args, timeout: int = 30) -> subprocess.CompletedProcess:
+        return _run(['git', '-c', f'safe.directory={self.source_dir}', *args], self.source_dir, timeout=timeout)
+
     def _status_base(self) -> Dict:
         return {
             'enabled': (self.source_dir / '.git').exists(),
@@ -85,15 +88,15 @@ class UpdateManager:
                 self._last_check = now
                 return status
 
-            fetch = _run(['git', 'fetch', '--quiet', 'origin', self.branch], self.source_dir, timeout=45)
+            fetch = self._git(['fetch', '--quiet', 'origin', self.branch], timeout=45)
             if fetch.returncode != 0:
                 status.update({'error': (fetch.stderr or fetch.stdout or 'git fetch failed').strip(), 'available': False})
                 self._cached_status = status
                 self._last_check = now
                 return status
 
-            local = _run(['git', 'rev-parse', 'HEAD'], self.source_dir)
-            remote = _run(['git', 'rev-parse', f'origin/{self.branch}'], self.source_dir)
+            local = self._git(['rev-parse', 'HEAD'])
+            remote = self._git(['rev-parse', f'origin/{self.branch}'])
             if local.returncode != 0 or remote.returncode != 0:
                 status.update({'error': 'Could not read local or remote git revision.', 'available': False})
                 self._cached_status = status
@@ -150,7 +153,7 @@ class UpdateManager:
                 if not status.get('available'):
                     result = {'ok': True, 'message': 'Already up to date.', 'restarted': False}
                     return
-                pull = _run(['git', 'pull', '--ff-only', 'origin', self.branch], self.source_dir, timeout=90)
+                pull = self._git(['pull', '--ff-only', 'origin', self.branch], timeout=90)
                 if pull.returncode != 0:
                     raise RuntimeError((pull.stderr or pull.stdout or 'git pull failed').strip())
                 self._copy_tree()

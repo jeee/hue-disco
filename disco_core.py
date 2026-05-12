@@ -616,6 +616,9 @@ class DiscoEngine:
 
     def start(self):
         if self.running:
+            self.override_until = 0.0
+            self.state.mode = 'disco'
+            self.mqtt.publish('state', {'mode': self.state.mode})
             return
         self.running = True
         self.state.mode = 'starting'
@@ -857,6 +860,8 @@ class DiscoEngine:
                     except queue.Empty:
                         continue
                     now, onset_score_raw, metrics = self._detect_audio_metrics(mono)
+                    if self.state.mode in ('manual_on', 'manual_off') and time.time() >= float(getattr(self, 'override_until', 0.0) or 0.0):
+                        self.state.mode = 'disco'
                     predicted_now = now + (int(self.cfg.get('beat_prediction_ms', 0)) / 1000.0)
                     min_interval = int(self.cfg.get('min_interval_ms', 140)) / 1000.0
                     triggered = False

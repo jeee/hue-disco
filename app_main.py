@@ -15,6 +15,7 @@ from waitress import serve
 from bootstrap_hue_credentials import bootstrap
 from disco_core import DiscoEngine
 from config_schema import export_settings_backup, import_settings_backup, load_config, parse_backup_payload, save_config
+from update_manager import UpdateManager
 
 
 def start_background_bootstrap(engine, config_path: str):
@@ -50,6 +51,14 @@ def create_app(config_path: str):
     engine = DiscoEngine(config_path)
     app = Flask(__name__, template_folder='templates')
     app.secret_key = engine.cfg.get('web', {}).get('session_secret', 'change-me')
+    app.update_manager = UpdateManager(os.path.dirname(os.path.abspath(__file__)))
+
+    @app.context_processor
+    def inject_update_status():
+        try:
+            return {'update_status': app.update_manager.check(force=False)}
+        except Exception as exc:
+            return {'update_status': {'enabled': False, 'available': False, 'error': str(exc)}}
 
     def require_password(level='control'):
         def deco(fn):
@@ -152,6 +161,24 @@ def create_app(config_path: str):
             return redirect('/admin?notice=' + quote_plus('Backup imported successfully. Review the settings and save again if you make further edits.'))
         except Exception as exc:
             return redirect('/admin?error=' + quote_plus(f'Backup import failed: {exc}'))
+
+    @app.post('/api/admin/update/check')
+    @require_password('admin')
+    def api_admin_update_check():
+        status = app.update_manager.check(force=True, max_age_s=0)
+        if status.get('error'):
+            return redirect('/admin?error=' + quote_plus(f'Update check failed: {status["error"]}'))
+        if status.get('available'):
+            return redirect('/admin?notice=' + quote_plus(f'Update available: {status.get("local_short", "unknown")} → {status.get("remote_short", "unknown")}'))
+        return redirect('/admin?notice=' + quote_plus('Hue Disco is already up to date.'))
+
+    @app.post('/api/admin/update/apply')
+    @require_password('admin')
+    def api_admin_update_apply():
+        result = app.update_manager.apply_and_restart_async()
+        if not result.get('started'):
+            return redirect('/admin?error=' + quote_plus(result.get('error', 'Update could not be started.')))
+        return redirect('/admin?notice=' + quote_plus(result.get('message', 'Update started.')))
 
     @app.post('/api/admin/save')
     @require_password('admin')

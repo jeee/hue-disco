@@ -39,6 +39,10 @@
     .info-tip:hover::after,.info-tip:focus-visible::after{content:attr(data-tip);position:absolute;left:50%;bottom:125%;transform:translateX(-50%);width:240px;padding:8px 10px;border-radius:10px;background:#0b1120;border:1px solid #334269;color:#eef2ff;font-size:.8rem;line-height:1.35;white-space:normal;box-shadow:0 12px 30px rgba(0,0,0,.35);z-index:50}
     .divider{height:1px;background:#26314e;margin:12px 0}
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .update-banner{margin-bottom:16px;padding:12px 14px;border-radius:16px;border:1px solid #6b4b16;background:#241a09;color:#ffe2a6;display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+    .update-banner.ok{border-color:#244d32;background:#0d2115;color:#baf7c8}
+    .update-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .inline-form{display:inline}
   </style>
 </head>
 <body>
@@ -52,6 +56,20 @@
         {% block header_actions %}{% endblock %}
       </div>
     </div>
+    {% if update_status and update_status.available %}
+    <div class="update-banner">
+      <div>
+        <strong>Update available</strong>
+        <span class="mono">{{ update_status.local_short }}</span> → <span class="mono">{{ update_status.remote_short }}</span>
+      </div>
+      <div class="update-actions">
+        <form class="inline-form" method="post" action="/api/admin/update/check"><button class="secondary" type="submit">Recheck</button></form>
+        <form class="inline-form" method="post" action="/api/admin/update/apply" onsubmit="return confirm('Update Hue Disco from GitHub and restart the app?');"><button type="submit">Install update & restart</button></form>
+      </div>
+    </div>
+    {% elif update_status and update_status.updating %}
+    <div class="update-banner ok"><strong>Update running</strong> Hue Disco will restart automatically if files are updated.</div>
+    {% endif %}
     {% block content %}{% endblock %}
   </div>
 </body>

@@ -30,6 +30,33 @@
   </div>
 </div>
 
+
+<div class="card stack">
+  <div class="row" style="justify-content:space-between;align-items:flex-start">
+    <div>
+      <h3 class="section-title">Application updates</h3>
+      <div class="small">
+        {% if update_status.enabled %}
+          Source checkout: <span class="mono">{{ update_status.source_dir }}</span>. Branch: <span class="mono">{{ update_status.branch }}</span>.
+          {% if update_status.available %}New version available: <span class="mono">{{ update_status.local_short }}</span> → <span class="mono">{{ update_status.remote_short }}</span>.{% else %}No newer version detected.{% endif %}
+        {% else %}
+          Update source checkout is not available on this install.
+        {% endif %}
+      </div>
+    </div>
+    <div class="row">
+      <form method="post" action="/api/admin/update/check"><button type="submit" class="secondary">Check GitHub</button></form>
+      {% if update_status.available %}
+      <form method="post" action="/api/admin/update/apply" onsubmit="return confirm('Update Hue Disco from GitHub and restart the app?');"><button type="submit">Install update & restart</button></form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="help">
+    <strong>What this updates</strong>
+    This pulls the configured Git branch, copies Hue Disco Python/template/plugin files into the running install, then exits so systemd restarts the app. It does not change config or install new OS packages.
+  </div>
+</div>
+
 <form method="post" action="/api/admin/save" id="admin-form" class="stack">
   <div class="grid-2">
     <div class="card stack">
@@ -52,11 +79,13 @@
       <h3 class="section-title">Beat detection</h3>
       <div class="grid">
         <div>
-          <label>Detector backend <span class="info-tip" tabindex="0" data-tip="Native is the safer default. aubio can feel more musical on some tracks, but it may still lock to half-time on some material.">i</span></label>
+          <label>Detector backend <span class="info-tip" tabindex="0" data-tip="Native Flux PLL BeatTracker is our local no-neural-network spectral-flux tracker with phase-locked beat prediction. It uses the same lightweight native signal path as the standalone tracker.">i</span></label>
           <select name="detector_backend">
             <option value="native" {% if state.detector_backend == 'native' %}selected{% endif %}>Native</option>
             <option value="aubio" {% if state.detector_backend == 'aubio' %}selected{% endif %}>aubio-ledfx</option>
             <option value="btrack" {% if state.detector_backend == 'btrack' %}selected{% endif %}>BTrack</option>
+            <option value="beattracker" {% if state.detector_backend in ['beattracker', 'native_flux_pll'] %}selected{% endif %}>Native Flux PLL BeatTracker</option>
+            <option value="beatnet" {% if state.detector_backend == 'beatnet' %}selected{% endif %}>BeatNet neural BeatTracker</option>
           </select>
         </div>
         <div>

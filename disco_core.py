@@ -18,6 +18,11 @@ except Exception:
     btrack_bt = None
 
 try:
+    from beat_plugin_loader import create_plugin_tracker
+except Exception:
+    create_plugin_tracker = None
+
+try:
     import paho.mqtt.client as mqtt
 except Exception:
     mqtt = None
@@ -142,6 +147,9 @@ class DiscoEngine:
         self.btrack_last_abs_time = 0.0
         self.btrack_eval_interval_s = 0.50
         self.btrack_last_eval = 0.0
+        self.beattracker = None
+        self.beattracker_input_rate = int(self.cfg.get('sample_rate', 44100))
+        self.detector_init_error = ''
         self.aubio_onset = None
         self.reload()
 
@@ -173,6 +181,9 @@ class DiscoEngine:
         )
 
     def _init_detectors(self):
+        self.beattracker = None
+        self.beattracker_input_rate = int(self.cfg.get('sample_rate', 44100))
+        self.detector_init_error = ''
         if aubio is not None and str(self.cfg.get('detector_backend', 'native')) == 'aubio':
             try:
                 self.aubio_onset = aubio.onset(
@@ -187,12 +198,45 @@ class DiscoEngine:
         else:
             self.aubio_onset = None
 
+        detector_backend = str(self.cfg.get('detector_backend', 'native'))
+        beat_plugin_name = None
+        if detector_backend in ('beattracker', 'native_flux_pll'):
+            beat_plugin_name = 'fresh_flux_pll'
+        elif detector_backend == 'beatnet':
+            beat_plugin_name = 'beatnet'
+
+        if beat_plugin_name:
+            if create_plugin_tracker is None:
+                self.detector_init_error = 'BeatTracker detector backend is not available: beat_plugin_loader could not be imported.'
+                self._mark_error(self.detector_init_error)
+                return
+            try:
+                source_rate = int(self.cfg.get('sample_rate', 44100))
+                plugin_rate = 22050 if source_rate == 44100 else source_rate
+                self.beattracker_input_rate = plugin_rate
+                self.beattracker = create_plugin_tracker(beat_plugin_name, {
+                    'sample_rate': plugin_rate,
+                    'hop_s': max(0.001, int(self.cfg.get('block_size', 1024)) / float(max(1, source_rate))),
+                    'bpm_min': float(self.cfg.get('bpm_min', 100)),
+                    'bpm_max': float(self.cfg.get('bpm_max', 165)),
+                    'silence_rms': 0.0060,
+                    'accept_phase_s': max(0.010, int(self.cfg.get('min_interval_ms', 140)) / 1000.0 * 0.35),
+                    'flash_lead_s': int(self.cfg.get('beat_prediction_ms', 0)) / 1000.0,
+                    'beatnet_model': int(self.cfg.get('beatnet_model', 2)),
+                })
+            except Exception as exc:
+                self.beattracker = None
+                self.detector_init_error = f'BeatTracker detector backend failed to initialize: {exc}'
+                self._mark_error(self.detector_init_error)
+
     def reload(self):
         self.cfg = load_config(self.config_path)
         self._init_detectors()
         self.mqtt = MQTTReporter(self.cfg)
         if self.cfg.get('app_key') and self.cfg.get('client_key'):
             self._clear_error()
+        if self.detector_init_error:
+            self._mark_error(self.detector_init_error)
         with self.lock:
             self.state.backend_mode = self.cfg.get('backend_mode')
             self.state.bridge_ip = self._resolved_bridge_ip(self.cfg)
@@ -684,6 +728,7 @@ class DiscoEngine:
 
     def _detect_audio_metrics(self, mono):
         now = time.time()
+        self._detector_forced_trigger = False
         rms = float(np.sqrt(np.mean(np.square(mono))))
         spec = np.abs(np.fft.rfft(mono))
         flux = 0.0
@@ -755,6 +800,27 @@ class DiscoEngine:
             except Exception:
                 pass
 
+        if str(self.cfg.get('detector_backend', 'native')) in ('beattracker', 'native_flux_pll', 'beatnet') and self.beattracker is not None:
+            try:
+                bt_mono = mono.astype(np.float32, copy=False)
+                if int(self.cfg.get('sample_rate', 44100)) == 44100 and int(getattr(self, 'beattracker_input_rate', 44100)) == 22050:
+                    bt_mono = bt_mono[::2]
+                update = self.beattracker.process_block(bt_mono, now=now)
+                self.state.bpm_estimate = round(float(update.bpm or self.state.bpm_estimate or 0.0), 1)
+                self.state.bpm_confidence = round(max(float(self.state.bpm_confidence or 0.0), float(update.confidence or 0.0)), 3)
+                self.phase_confidence = max(float(self.phase_confidence or 0.0), float(update.confidence or 0.0))
+                self.state.phase_confidence = round(self.phase_confidence, 3)
+                if update.bpm and update.bpm > 0:
+                    self.phase_period = 60.0 / float(update.bpm)
+                    if self.phase_anchor <= 0.0:
+                        self.phase_anchor = float(update.beat_time or update.peak_time or now)
+                if update.accepted_peak or update.beat_due:
+                    self._detector_forced_trigger = True
+                    onset_score = max(onset_score, 1.35)
+                    metrics['onset_score'] = max(metrics['onset_score'], 1.20)
+            except Exception as exc:
+                self._mark_error(f'BeatTracker detector backend failed while processing audio: {exc}')
+
         self.current_metrics = metrics
         self.state.last_energy = round(rms, 4)
         self.state.last_flux = round(flux, 4)
@@ -803,7 +869,7 @@ class DiscoEngine:
                         and current_rms >= 0.006
                         and current_flux >= 0.010
                         and current_band >= 0.18
-                    )
+                    ) or bool(getattr(self, '_detector_forced_trigger', False))
 
                     if strong_live_trigger:
                         self._last_live_beat_evidence = predicted_now

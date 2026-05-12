@@ -427,7 +427,7 @@ function ensureProfileShape(profile, key) {
 Object.entries(profiles).forEach(([key, profile]) => ensureProfileShape(profile, key));
 
 function csvToPalette(text) {
-  return String(text || '').split(',').map(item => normalizeHex(item)).filter(Boolean);
+  return parsePaletteList(text);
 }
 function paletteToCsv(arr) {
   return (arr || []).join(', ');
@@ -438,6 +438,10 @@ function normalizeHex(value) {
   if (!text.startsWith('#')) text = '#' + text;
   if (/^#[0-9a-fA-F]{3}$/.test(text)) text = '#' + text.slice(1).split('').map(ch => ch + ch).join('');
   return /^#[0-9a-fA-F]{6}$/.test(text) ? text.toUpperCase() : '';
+}
+function parsePaletteList(value) {
+  const parts = String(value || '').split(/[\s,;]+/).map(item => item.trim()).filter(Boolean);
+  return [...new Set(parts.map(item => normalizeHex(item)).filter(Boolean))];
 }
 function renderPaletteEditor(editorId, inputId, persistFn) {
   const editor = document.getElementById(editorId);
@@ -452,7 +456,19 @@ function renderPaletteEditor(editorId, inputId, persistFn) {
     const chip = document.createElement('span');
     chip.className = 'color-chip';
     chip.style.setProperty('--chip-color', color);
-    chip.innerHTML = `<span class="color-dot"></span><span class="mono">${color}</span><button type="button" title="Remove color">×</button>`;
+    chip.innerHTML = `<span class="color-dot"></span><input type="color" value="${color}" title="Change color"><input type="text" class="mono" value="${color}" title="Hex color"><button type="button" title="Remove color">×</button>`;
+    const chipPicker = chip.querySelector('input[type=color]');
+    const chipText = chip.querySelector('input[type=text]');
+    const setColor = (value) => {
+      const next = normalizeHex(value);
+      if (!next) return;
+      colors[idx] = next;
+      input.value = paletteToCsv([...new Set(colors)]);
+      persistFn();
+    };
+    chipPicker.addEventListener('change', e => setColor(e.target.value));
+    chipText.addEventListener('change', e => setColor(e.target.value));
+    chipText.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); setColor(e.target.value); } });
     chip.querySelector('button').addEventListener('click', () => {
       colors.splice(idx, 1);
       input.value = paletteToCsv(colors);
@@ -464,13 +480,14 @@ function renderPaletteEditor(editorId, inputId, persistFn) {
 
   const row = document.createElement('div');
   row.className = 'color-row';
-  row.innerHTML = '<input type="color" value="#FFFFFF"><input type="text" placeholder="#RRGGBB"><button type="button" class="secondary">Add</button>';
+  row.innerHTML = '<input type="color" value="#FFFFFF"><input type="text" placeholder="#RRGGBB or paste: #FF0040 #00C8FF; #FFE600"><button type="button" class="secondary">Add</button>';
   const picker = row.querySelector('input[type=color]');
   const text = row.querySelector('input[type=text]');
   const add = () => {
-    const color = normalizeHex(text.value || picker.value);
-    if (!color) return;
-    colors.push(color);
+    const pasted = parsePaletteList(text.value);
+    const additions = pasted.length ? pasted : [normalizeHex(picker.value)].filter(Boolean);
+    if (!additions.length) return;
+    colors.push(...additions);
     input.value = paletteToCsv([...new Set(colors)]);
     persistFn();
   };

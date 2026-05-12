@@ -219,9 +219,16 @@
             <div><label>Default render mode</label><select id="profile-render-mode"><option>hybrid</option><option>color_only</option><option>pulse_only</option><option>calibration</option></select></div>
             <div><label>Default intensity mode</label><select id="profile-intensity-mode"><option>adaptive</option><option>audio</option><option>fixed</option></select></div>
             <div><label>Default grid behavior</label><select id="profile-grid-behavior"><option>adaptive</option><option>gated</option><option>continuous</option></select></div>
-            <div><label>Palette colors</label><input id="profile-palette"></div>
+            <div>
+              <label>Palette colors</label>
+              <input id="profile-palette" type="hidden">
+              <div id="profile-palette-editor" class="palette-editor"></div>
+            </div>
             <div><label>Palette bias</label><select id="profile-palette-bias"><option>mixed</option><option>warm</option><option>cool</option><option>vivid</option><option>pastel</option><option>deep</option></select></div>
-            <div><label>Static color</label><input id="profile-static-color"></div>
+            <div>
+              <label>Static color</label>
+              <div class="color-row"><input id="profile-static-color" type="text" placeholder="#RRGGBB"><input id="profile-static-color-picker" type="color" value="#FFFFFF"></div>
+            </div>
           </div>
           <div class="help"><strong>Profile defaults</strong> These values are the room-wide defaults for this profile. Groups inherit them and only need to override what should differ. Put the main room palette here, then use group palettes only when one set of lights should intentionally look different.</div>
           <div class="grid">
@@ -268,9 +275,16 @@
                 <div><label>Render mode <span class="info-tip" tabindex="0" data-tip="Hybrid is the normal music mode. Calibration is only for timing tests. Color only reduces beat pulsing; pulse only reduces color motion.">i</span></label><select id="group-render-mode"><option>hybrid</option><option>color_only</option><option>pulse_only</option><option>calibration</option></select></div>
                 <div><label>Intensity mode <span class="info-tip" tabindex="0" data-tip="Fixed gives every pulse the same strength. Audio follows current signal strength. Adaptive keeps a base pulse but grows stronger on stronger musical moments.">i</span></label><select id="group-intensity-mode"><option>adaptive</option><option>audio</option><option>fixed</option></select></div>
                 <div><label>Grid behavior <span class="info-tip" tabindex="0" data-tip="Continuous always pulses on the beat grid. Gated only pulses when current audio supports it. Adaptive scales pulse strength with the audio.">i</span></label><select id="group-grid-behavior"><option>adaptive</option><option>gated</option><option>continuous</option></select></div>
-                <div><label>Palette colors</label><input id="group-palette"></div>
+                <div>
+                  <label>Palette colors</label>
+                  <input id="group-palette" type="hidden">
+                  <div id="group-palette-editor" class="palette-editor"></div>
+                </div>
                 <div><label>Palette bias</label><select id="group-palette-bias"><option>mixed</option><option>warm</option><option>cool</option><option>vivid</option><option>pastel</option><option>deep</option></select></div>
-                <div><label>Static color</label><input id="group-static-color"></div>
+                <div>
+                  <label>Static color</label>
+                  <div class="color-row"><input id="group-static-color" type="text" placeholder="#RRGGBB"><input id="group-static-color-picker" type="color" value="#FFFFFF"></div>
+                </div>
                 <div><label>Base brightness</label><input id="group-base"></div>
                 <div><label>Peak brightness</label><input id="group-peak"></div>
                 <div><label>Attack ms</label><input id="group-attack"></div>
@@ -413,10 +427,65 @@ function ensureProfileShape(profile, key) {
 Object.entries(profiles).forEach(([key, profile]) => ensureProfileShape(profile, key));
 
 function csvToPalette(text) {
-  return String(text || '').split(',').map(item => item.trim()).filter(Boolean);
+  return String(text || '').split(',').map(item => normalizeHex(item)).filter(Boolean);
 }
 function paletteToCsv(arr) {
   return (arr || []).join(', ');
+}
+function normalizeHex(value) {
+  let text = String(value || '').trim();
+  if (!text) return '';
+  if (!text.startsWith('#')) text = '#' + text;
+  if (/^#[0-9a-fA-F]{3}$/.test(text)) text = '#' + text.slice(1).split('').map(ch => ch + ch).join('');
+  return /^#[0-9a-fA-F]{6}$/.test(text) ? text.toUpperCase() : '';
+}
+function renderPaletteEditor(editorId, inputId, persistFn) {
+  const editor = document.getElementById(editorId);
+  const input = document.getElementById(inputId);
+  if (!editor || !input) return;
+  const colors = csvToPalette(input.value);
+  input.value = paletteToCsv(colors);
+  editor.innerHTML = '';
+  const chips = document.createElement('div');
+  chips.className = 'palette-chips';
+  colors.forEach((color, idx) => {
+    const chip = document.createElement('span');
+    chip.className = 'color-chip';
+    chip.style.setProperty('--chip-color', color);
+    chip.innerHTML = `<span class="color-dot"></span><span class="mono">${color}</span><button type="button" title="Remove color">×</button>`;
+    chip.querySelector('button').addEventListener('click', () => {
+      colors.splice(idx, 1);
+      input.value = paletteToCsv(colors);
+      persistFn();
+    });
+    chips.appendChild(chip);
+  });
+  editor.appendChild(chips);
+
+  const row = document.createElement('div');
+  row.className = 'color-row';
+  row.innerHTML = '<input type="color" value="#FFFFFF"><input type="text" placeholder="#RRGGBB"><button type="button" class="secondary">Add</button>';
+  const picker = row.querySelector('input[type=color]');
+  const text = row.querySelector('input[type=text]');
+  const add = () => {
+    const color = normalizeHex(text.value || picker.value);
+    if (!color) return;
+    colors.push(color);
+    input.value = paletteToCsv([...new Set(colors)]);
+    persistFn();
+  };
+  picker.addEventListener('input', () => { text.value = picker.value.toUpperCase(); });
+  text.addEventListener('input', () => { const color = normalizeHex(text.value); if (color) picker.value = color; });
+  text.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+  row.querySelector('button').addEventListener('click', add);
+  editor.appendChild(row);
+}
+function syncColorPicker(textId, pickerId) {
+  const text = document.getElementById(textId);
+  const picker = document.getElementById(pickerId);
+  if (!text || !picker) return;
+  const color = normalizeHex(text.value);
+  if (color) picker.value = color;
 }
 function sanitizeProfileKey(name) {
   return String(name || 'custom_profile').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '_') || 'custom_profile';
@@ -484,8 +553,10 @@ function fillProfileEditor() {
   document.getElementById('profile-intensity-mode').value = d.intensity_mode || 'adaptive';
   document.getElementById('profile-grid-behavior').value = d.grid_behavior || 'adaptive';
   document.getElementById('profile-palette').value = paletteToCsv(d.palette_colors);
+  renderPaletteEditor('profile-palette-editor', 'profile-palette', () => persistProfileEditor(false));
   document.getElementById('profile-palette-bias').value = d.palette_bias || 'mixed';
   document.getElementById('profile-static-color').value = d.static_color || '';
+  syncColorPicker('profile-static-color', 'profile-static-color-picker');
   document.getElementById('profile-base-brightness').value = d.base_brightness;
   document.getElementById('profile-peak-brightness').value = d.peak_brightness;
   document.getElementById('profile-attack').value = d.pulse_attack_ms;
@@ -515,8 +586,10 @@ function fillGroupEditor() {
   document.getElementById('group-intensity-mode').value = o.intensity_mode || 'adaptive';
   document.getElementById('group-grid-behavior').value = o.grid_behavior || 'adaptive';
   document.getElementById('group-palette').value = paletteToCsv(o.palette_colors);
+  renderPaletteEditor('group-palette-editor', 'group-palette', persistGroupEditor);
   document.getElementById('group-palette-bias').value = o.palette_bias || 'mixed';
   document.getElementById('group-static-color').value = o.static_color || '';
+  syncColorPicker('group-static-color', 'group-static-color-picker');
   document.getElementById('group-base').value = o.base_brightness;
   document.getElementById('group-peak').value = o.peak_brightness;
   document.getElementById('group-attack').value = o.pulse_attack_ms;
@@ -767,6 +840,8 @@ document.getElementById('preset-select').addEventListener('change', e => { curre
 document.getElementById('profile-name').addEventListener('change', () => persistProfileEditor(true));
 ['profile-description','profile-render-mode','profile-intensity-mode','profile-grid-behavior','profile-palette','profile-palette-bias','profile-static-color','profile-base-brightness','profile-peak-brightness','profile-attack','profile-hold','profile-decay','profile-pulse-mix','profile-pulse-intensity','profile-color-motion','profile-color-step','profile-accent-every','profile-accent-multiplier','profile-group-activity','profile-min-pulse','profile-max-pulse','profile-audio-gain','profile-audio-gate'].forEach(id => document.getElementById(id).addEventListener('input', () => persistProfileEditor(id !== 'profile-name')));
 ['group-name','group-role','group-render-mode','group-intensity-mode','group-grid-behavior','group-palette','group-palette-bias','group-static-color','group-base','group-peak','group-attack','group-hold','group-decay','group-pulse-mix','group-pulse-intensity','group-color-motion','group-color-step','group-activity','group-accent-every','group-accent-multiplier','group-min-pulse','group-max-pulse','group-audio-gain','group-audio-gate'].forEach(id => document.getElementById(id).addEventListener('input', persistGroupEditor));
+document.getElementById('profile-static-color-picker').addEventListener('input', e => { document.getElementById('profile-static-color').value = e.target.value.toUpperCase(); persistProfileEditor(false); });
+document.getElementById('group-static-color-picker').addEventListener('input', e => { document.getElementById('group-static-color').value = e.target.value.toUpperCase(); persistGroupEditor(); });
 ['preset-name','preset-duration','preset-on','preset-off','preset-sync'].forEach(id => document.getElementById(id).addEventListener('input', persistPresetEditor));
 document.getElementById('add-profile-btn').addEventListener('click', addProfile);
 document.getElementById('copy-profile-btn').addEventListener('click', copyProfile);

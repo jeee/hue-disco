@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block header_actions %}
+<a href="/" class="btn secondary">Control</a>
+<a href="/admin" class="btn secondary">Admin</a>
+{% endblock %}
+{% block content %}
+<div class="card stack">
+  <div class="row" style="justify-content:space-between;align-items:flex-start">
+    <div>
+      <h3 class="section-title">Live runtime log</h3>
+      <div class="small">Polls Hue Disco status once per second and appends changes. Useful for checking detector, audio gate, render source, errors and bridge state while music is playing.</div>
+    </div>
+    <div class="row">
+      <button type="button" class="secondary" id="pause-btn">Pause</button>
+      <button type="button" class="secondary" id="clear-btn">Clear</button>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h3 class="section-title">Current snapshot</h3>
+    <pre id="snapshot" class="mono" style="white-space:pre-wrap;margin:0"></pre>
+  </div>
+  <div class="card">
+    <h3 class="section-title">Event stream</h3>
+    <pre id="log" class="mono" style="white-space:pre-wrap;margin:0;max-height:70vh;overflow:auto"></pre>
+  </div>
+</div>
+
+<script>
+let paused = false;
+let lastLine = '';
+let lastError = '';
+const logEl = document.getElementById('log');
+const snapEl = document.getElementById('snapshot');
+function fmt(v) { return v === undefined || v === null ? '' : v; }
+function lineFromStatus(s) {
+  const audio = `rms=${fmt(s.last_energy)} flux=${fmt(s.last_flux)} band=${fmt(s.last_band_energy)} onset=${fmt(s.last_onset_score)}`;
+  const beat = `bpm=${fmt(s.bpm_estimate)} conf=${fmt(s.bpm_confidence)} phase=${fmt(s.phase_confidence)} count=${fmt(s.beat_count)}`;
+  return `${new Date().toLocaleTimeString()} mode=${fmt(s.mode)} backend=${fmt(s.detector_backend)} source=${fmt(s.last_render_source || 'n/a')} stream=${fmt(s.stream_active)} ${beat} ${audio}${s.last_error ? ' ERROR=' + s.last_error : ''}`;
+}
+async function tick() {
+  if (paused) return;
+  try {
+    const r = await fetch('/status?_ts=' + Date.now(), {cache:'no-store', credentials:'same-origin'});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const s = await r.json();
+    snapEl.textContent = JSON.stringify(s, null, 2);
+    const line = lineFromStatus(s);
+    if (line !== lastLine || s.last_error !== lastError) {
+      logEl.textContent += line + '\n';
+      logEl.scrollTop = logEl.scrollHeight;
+      lastLine = line;
+      lastError = s.last_error || '';
+    }
+  } catch (e) {
+    const line = `${new Date().toLocaleTimeString()} log poll failed: ${e}`;
+    if (line !== lastLine) logEl.textContent += line + '\n';
+    lastLine = line;
+  }
+}
+document.getElementById('pause-btn').addEventListener('click', e => { paused = !paused; e.target.textContent = paused ? 'Resume' : 'Pause'; });
+document.getElementById('clear-btn').addEventListener('click', () => { logEl.textContent = ''; lastLine = ''; });
+setInterval(tick, 1000);
+tick();
+</script>
+{% endblock %}

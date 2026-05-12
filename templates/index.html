@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block header_actions %}
 <a href="/admin" class="btn secondary">Admin</a>
+<a href="/logs" target="_blank" class="btn secondary">Live log</a>
 {% endblock %}
 {% block content %}
 {% if state.last_error %}<div class="card"><div class="error"><strong>Bridge/bootstrap status</strong> {{ state.last_error }}</div></div>{% endif %}

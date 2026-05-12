@@ -90,6 +90,11 @@ def create_app(config_path: str):
         error = request.args.get('error', '')
         return render_template('admin.html', state=engine.get_state(), notice=notice, error=error)
 
+    @app.get('/logs')
+    @require_password('control')
+    def logs_page():
+        return render_template('logs.html', state=engine.get_state())
+
     @app.post('/api/control/start')
     @require_password('control')
     def api_start():

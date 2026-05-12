@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block header_actions %}
 <a href="/" class="btn secondary">Control</a>
+<a href="/logs" target="_blank" class="btn secondary">Live log</a>
 {% endblock %}
 {% block content %}
 {% if notice %}<div class="card"><div class="ok"><strong>Success</strong> {{ notice }}</div></div>{% endif %}
@@ -57,6 +58,8 @@
   </div>
 </div>
 
+<form method="post" action="/api/admin/bridge/rediscover" id="bridge-rediscover-form"></form>
+
 <form method="post" action="/api/admin/save" id="admin-form" class="stack">
   <div class="grid-2">
     <div class="card stack">
@@ -66,7 +69,7 @@
         <input name="bridge_ip" value="{{ state.bridge_ip }}">
       </div>
       <div class="row">
-        <form method="post" action="/api/admin/bridge/rediscover" onsubmit="return confirm('Clear saved bridge credentials and search again?');"><button type="submit" class="secondary">Rediscover bridge</button></form>
+        <button type="submit" class="secondary" form="bridge-rediscover-form" onclick="return confirm('Clear saved bridge credentials and search again?');">Rediscover bridge</button>
       </div>
       <div>
         <label>Entertainment group ID</label>

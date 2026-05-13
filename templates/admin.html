@@ -330,7 +330,7 @@
                 <div><label>Audio gate</label><input id="group-audio-gate"></div>
                 <div><label>Beat chase off %</label><input id="group-chase-off"></div>
               </div>
-              <div class="help"><strong>Group design tip</strong> Use groups for behavior. For a slow ceiling chase, split the 20 spots into 4 groups, set those groups to <span class="mono">beat_chase</span>, set Change/chase every to e.g. 4, and set Beat chase off % to 0 for true off or e.g. 10–20 for a dim glow. Each chase group stays steadily on for its own Change/chase every value. Groups not set to beat_chase keep rendering normally.</div>
+              <div class="help"><strong>Group design tip</strong> Use groups for behavior. For a slow ceiling chase, split the 20 spots into 4 groups, set those groups to <span class="mono">beat_chase</span>, set Change/chase every to e.g. 4, and set Beat chase off % to 0 for true off or e.g. 10–20 for a dim glow. Each chase group stays steadily on for its own Change/chase every value and holds one color until its next activation. Groups not set to beat_chase keep rendering normally.</div>
               <div>
                 <label>Lights in this group</label>
                 <div id="group-lights" class="grid"></div>

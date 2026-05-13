@@ -495,6 +495,15 @@ class DiscoEngine:
         r, g, b = colorsys.hsv_to_rgb((self.current_hue + group_index * 0.11) % 1.0, 1.0, 1.0)
         return int(r * 255), int(g * 255), int(b * 255)
 
+    def _stable_group_color(self, group_index, light, group_settings, profile_defaults, activation_index=0):
+        palette = self._bias_palette(self._palette_for_light(light, group_settings, profile_defaults), group_settings.get('palette_bias') or profile_defaults.get('palette_bias'))
+        if palette:
+            idx = (max(0, int(activation_index)) + group_index) % len(palette)
+            return self._hex_to_rgb(palette[idx])
+        hue = ((max(0, int(activation_index)) * (float(self.cfg.get('hue_step', 18)) / 360.0)) + group_index * 0.11) % 1.0
+        r, g, b = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
+        return int(r * 255), int(g * 255), int(b * 255)
+
     def _normalize_audio_strength(self, audio_metrics):
         rms = max(0.0, min(1.0, float(audio_metrics.get('rms', 0.0)) * 10.0))
         flux = max(0.0, min(1.0, float(audio_metrics.get('flux', 0.0)) * 18.0))
@@ -564,13 +573,16 @@ class DiscoEngine:
         profile_defaults, groups = self._build_profile_groups()
         chase_indices = [idx for idx, group in enumerate(groups) if str(group['settings'].get('render_mode') or '').lower() == 'beat_chase']
         active_chase_idx = None
+        chase_cycle_index = 0
         if chase_indices:
             chase_durations = []
             for chase_idx in chase_indices:
                 chase_settings = groups[chase_idx]['settings']
                 chase_durations.append(max(1, int(chase_settings.get('change_every_beats', profile_defaults.get('change_every_beats', 1)))))
             cycle_len = max(1, sum(chase_durations))
-            beat_pos = max(0, int(self.state.beat_count) - 1) % cycle_len
+            chase_beat_index = max(0, int(self.state.beat_count) - 1)
+            chase_cycle_index = chase_beat_index // cycle_len
+            beat_pos = chase_beat_index % cycle_len
             cursor = 0
             for chase_idx, duration in zip(chase_indices, chase_durations):
                 cursor += duration
@@ -596,7 +608,10 @@ class DiscoEngine:
                 lid = self._resolved_light_id(light)
                 if lid is None or lid not in group['light_ids']:
                     continue
-                color_rgb = self._group_color(idx, light, settings, profile_defaults)
+                if render_mode == 'beat_chase':
+                    color_rgb = self._stable_group_color(idx, light, settings, profile_defaults, chase_cycle_index)
+                else:
+                    color_rgb = self._group_color(idx, light, settings, profile_defaults)
                 base_rgb = self._apply_brightness(color_rgb, base_brightness)
                 dynamic_brightness = base_brightness + ((peak_brightness - base_brightness) * min(1.0, pulse_strength))
                 if render_mode == 'beat_chase' and not chase_active:

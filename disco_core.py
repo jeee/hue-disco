@@ -563,12 +563,20 @@ class DiscoEngine:
         now = now or time.time()
         profile_defaults, groups = self._build_profile_groups()
         chase_indices = [idx for idx, group in enumerate(groups) if str(group['settings'].get('render_mode') or '').lower() == 'beat_chase']
-        chase_every_beats = 1
+        active_chase_idx = None
         if chase_indices:
-            first_chase_settings = groups[chase_indices[0]]['settings']
-            chase_every_beats = max(1, int(first_chase_settings.get('change_every_beats', profile_defaults.get('change_every_beats', 1))))
-        chase_step = max(0, int(self.state.beat_count) - 1) // chase_every_beats
-        active_chase_idx = chase_indices[chase_step % len(chase_indices)] if chase_indices else None
+            chase_durations = []
+            for chase_idx in chase_indices:
+                chase_settings = groups[chase_idx]['settings']
+                chase_durations.append(max(1, int(chase_settings.get('change_every_beats', profile_defaults.get('change_every_beats', 1)))))
+            cycle_len = max(1, sum(chase_durations))
+            beat_pos = max(0, int(self.state.beat_count) - 1) % cycle_len
+            cursor = 0
+            for chase_idx, duration in zip(chase_indices, chase_durations):
+                cursor += duration
+                if beat_pos < cursor:
+                    active_chase_idx = chase_idx
+                    break
         payload = []
         for idx, group in enumerate(groups):
             settings = group['settings']
@@ -594,6 +602,8 @@ class DiscoEngine:
                 if render_mode == 'beat_chase' and not chase_active:
                     off_pct = max(0.0, min(100.0, float(settings.get('chase_off_brightness', profile_defaults.get('chase_off_brightness', 0.0))))) / 100.0
                     final_rgb = self._apply_brightness(color_rgb, base_brightness * off_pct)
+                elif render_mode == 'beat_chase' and chase_active:
+                    final_rgb = self._apply_brightness(color_rgb, peak_brightness)
                 elif render_mode == 'color_only':
                     final_rgb = self._apply_brightness(color_rgb, max(base_brightness, peak_brightness * 0.75))
                 elif render_mode == 'pulse_only':

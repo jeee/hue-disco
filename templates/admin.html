@@ -298,7 +298,7 @@
               <div class="grid">
                 <div><label>Group name</label><input id="group-name"></div>
                 <div><label>Role</label><select id="group-role"><option>custom</option><option>ambient</option><option>main</option><option>accent</option><option>background</option><option>percussive</option><option>melodic</option></select></div>
-                <div><label>Render mode <span class="info-tip" tabindex="0" data-tip="Hybrid is the normal music mode. Beat chase cycles one beat-chase group on for Change/chase every beats, while other beat-chase groups go to the configured off percentage. Calibration is only for timing tests.">i</span></label><select id="group-render-mode"><option>hybrid</option><option>color_only</option><option>pulse_only</option><option>beat_chase</option><option>calibration</option></select></div>
+                <div><label>Render mode <span class="info-tip" tabindex="0" data-tip="Hybrid is the normal music mode. Beat chase holds one beat-chase group steadily on for Change/chase every beats, while other beat-chase groups go to the configured off percentage. Calibration is only for timing tests.">i</span></label><select id="group-render-mode"><option>hybrid</option><option>color_only</option><option>pulse_only</option><option>beat_chase</option><option>calibration</option></select></div>
                 <div><label>Intensity mode <span class="info-tip" tabindex="0" data-tip="Fixed gives every pulse the same strength. Audio follows current signal strength. Adaptive keeps a base pulse but grows stronger on stronger musical moments.">i</span></label><select id="group-intensity-mode"><option>adaptive</option><option>audio</option><option>fixed</option></select></div>
                 <div><label>Grid behavior <span class="info-tip" tabindex="0" data-tip="Continuous always pulses on the beat grid. Gated only pulses when current audio supports it. Adaptive scales pulse strength with the audio.">i</span></label><select id="group-grid-behavior"><option>adaptive</option><option>gated</option><option>continuous</option></select></div>
                 <div>
@@ -330,7 +330,7 @@
                 <div><label>Audio gate</label><input id="group-audio-gate"></div>
                 <div><label>Beat chase off %</label><input id="group-chase-off"></div>
               </div>
-              <div class="help"><strong>Group design tip</strong> Use groups for behavior. For a slow ceiling chase, split the 20 spots into 4 groups, set those groups to <span class="mono">beat_chase</span>, set Change/chase every to e.g. 4, and set Beat chase off % to 0 for true off or e.g. 10–20 for a dim glow. Groups not set to beat_chase keep rendering normally.</div>
+              <div class="help"><strong>Group design tip</strong> Use groups for behavior. For a slow ceiling chase, split the 20 spots into 4 groups, set those groups to <span class="mono">beat_chase</span>, set Change/chase every to e.g. 4, and set Beat chase off % to 0 for true off or e.g. 10–20 for a dim glow. Each chase group stays steadily on for its own Change/chase every value. Groups not set to beat_chase keep rendering normally.</div>
               <div>
                 <label>Lights in this group</label>
                 <div id="group-lights" class="grid"></div>

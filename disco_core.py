@@ -563,7 +563,12 @@ class DiscoEngine:
         now = now or time.time()
         profile_defaults, groups = self._build_profile_groups()
         chase_indices = [idx for idx, group in enumerate(groups) if str(group['settings'].get('render_mode') or '').lower() == 'beat_chase']
-        active_chase_idx = chase_indices[self.state.beat_count % len(chase_indices)] if chase_indices else None
+        chase_every_beats = 1
+        if chase_indices:
+            first_chase_settings = groups[chase_indices[0]]['settings']
+            chase_every_beats = max(1, int(first_chase_settings.get('change_every_beats', profile_defaults.get('change_every_beats', 1))))
+        chase_step = max(0, int(self.state.beat_count) - 1) // chase_every_beats
+        active_chase_idx = chase_indices[chase_step % len(chase_indices)] if chase_indices else None
         payload = []
         for idx, group in enumerate(groups):
             settings = group['settings']

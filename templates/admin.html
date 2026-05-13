@@ -265,6 +265,7 @@
             <div><label>Pulse intensity</label><input id="profile-pulse-intensity"></div>
             <div><label>Color motion</label><input id="profile-color-motion"></div>
             <div><label>Color step scale</label><input id="profile-color-step"></div>
+            <div><label>Change/chase every beats <span class="info-tip" tabindex="0" data-tip="For color motion this controls how often colors step. For beat_chase groups this controls how many beats each chase group stays active before moving to the next group. Use 4 for a slow four-beat group alternation.">i</span></label><input id="profile-change-every"></div>
             <div><label>Accent every beats</label><input id="profile-accent-every"></div>
             <div><label>Accent multiplier</label><input id="profile-accent-multiplier"></div>
             <div><label>Group activity</label><input id="profile-group-activity"></div>
@@ -297,7 +298,7 @@
               <div class="grid">
                 <div><label>Group name</label><input id="group-name"></div>
                 <div><label>Role</label><select id="group-role"><option>custom</option><option>ambient</option><option>main</option><option>accent</option><option>background</option><option>percussive</option><option>melodic</option></select></div>
-                <div><label>Render mode <span class="info-tip" tabindex="0" data-tip="Hybrid is the normal music mode. Beat chase cycles one beat-chase group on per beat while other beat-chase groups go to the configured off percentage. Calibration is only for timing tests.">i</span></label><select id="group-render-mode"><option>hybrid</option><option>color_only</option><option>pulse_only</option><option>beat_chase</option><option>calibration</option></select></div>
+                <div><label>Render mode <span class="info-tip" tabindex="0" data-tip="Hybrid is the normal music mode. Beat chase cycles one beat-chase group on for Change/chase every beats, while other beat-chase groups go to the configured off percentage. Calibration is only for timing tests.">i</span></label><select id="group-render-mode"><option>hybrid</option><option>color_only</option><option>pulse_only</option><option>beat_chase</option><option>calibration</option></select></div>
                 <div><label>Intensity mode <span class="info-tip" tabindex="0" data-tip="Fixed gives every pulse the same strength. Audio follows current signal strength. Adaptive keeps a base pulse but grows stronger on stronger musical moments.">i</span></label><select id="group-intensity-mode"><option>adaptive</option><option>audio</option><option>fixed</option></select></div>
                 <div><label>Grid behavior <span class="info-tip" tabindex="0" data-tip="Continuous always pulses on the beat grid. Gated only pulses when current audio supports it. Adaptive scales pulse strength with the audio.">i</span></label><select id="group-grid-behavior"><option>adaptive</option><option>gated</option><option>continuous</option></select></div>
                 <div>
@@ -319,6 +320,7 @@
                 <div><label>Pulse intensity</label><input id="group-pulse-intensity"></div>
                 <div><label>Color motion</label><input id="group-color-motion"></div>
                 <div><label>Color step</label><input id="group-color-step"></div>
+                <div><label>Change/chase every</label><input id="group-change-every"></div>
                 <div><label>Activity</label><input id="group-activity"></div>
                 <div><label>Accent every</label><input id="group-accent-every"></div>
                 <div><label>Accent multiplier</label><input id="group-accent-multiplier"></div>
@@ -328,7 +330,7 @@
                 <div><label>Audio gate</label><input id="group-audio-gate"></div>
                 <div><label>Beat chase off %</label><input id="group-chase-off"></div>
               </div>
-              <div class="help"><strong>Group design tip</strong> Use groups for behavior. For a ceiling chase, split the 20 spots into 4 groups, set those groups to <span class="mono">beat_chase</span>, and set Beat chase off % to 0 for true off or e.g. 10–20 for a dim glow. Groups not set to beat_chase keep rendering normally.</div>
+              <div class="help"><strong>Group design tip</strong> Use groups for behavior. For a slow ceiling chase, split the 20 spots into 4 groups, set those groups to <span class="mono">beat_chase</span>, set Change/chase every to e.g. 4, and set Beat chase off % to 0 for true off or e.g. 10–20 for a dim glow. Groups not set to beat_chase keep rendering normally.</div>
               <div>
                 <label>Lights in this group</label>
                 <div id="group-lights" class="grid"></div>
@@ -610,6 +612,7 @@ function fillProfileEditor() {
   document.getElementById('profile-pulse-intensity').value = d.pulse_intensity;
   document.getElementById('profile-color-motion').value = d.color_motion;
   document.getElementById('profile-color-step').value = d.color_step_scale;
+  document.getElementById('profile-change-every').value = d.change_every_beats;
   document.getElementById('profile-accent-every').value = d.accent_every_beats;
   document.getElementById('profile-accent-multiplier').value = d.accent_multiplier;
   document.getElementById('profile-group-activity').value = d.group_activity;
@@ -644,6 +647,7 @@ function fillGroupEditor() {
   document.getElementById('group-pulse-intensity').value = o.pulse_intensity;
   document.getElementById('group-color-motion').value = o.color_motion;
   document.getElementById('group-color-step').value = o.color_step_scale;
+  document.getElementById('group-change-every').value = o.change_every_beats;
   document.getElementById('group-activity').value = o.group_activity;
   document.getElementById('group-accent-every').value = o.accent_every_beats;
   document.getElementById('group-accent-multiplier').value = o.accent_multiplier;
@@ -696,6 +700,7 @@ function persistProfileEditor(rename = true) {
     pulse_intensity: Number(document.getElementById('profile-pulse-intensity').value || 0.7),
     color_motion: Number(document.getElementById('profile-color-motion').value || 0.35),
     color_step_scale: Number(document.getElementById('profile-color-step').value || 0.5),
+    change_every_beats: Number(document.getElementById('profile-change-every').value || 1),
     accent_every_beats: Number(document.getElementById('profile-accent-every').value || 4),
     accent_multiplier: Number(document.getElementById('profile-accent-multiplier').value || 1.08),
     group_activity: Number(document.getElementById('profile-group-activity').value || 1.0),
@@ -733,6 +738,7 @@ function persistGroupEditor() {
     pulse_intensity: Number(document.getElementById('group-pulse-intensity').value || 0.7),
     color_motion: Number(document.getElementById('group-color-motion').value || 0.35),
     color_step_scale: Number(document.getElementById('group-color-step').value || 0.5),
+    change_every_beats: Number(document.getElementById('group-change-every').value || 1),
     group_activity: Number(document.getElementById('group-activity').value || 1.0),
     accent_every_beats: Number(document.getElementById('group-accent-every').value || 4),
     accent_multiplier: Number(document.getElementById('group-accent-multiplier').value || 1.08),

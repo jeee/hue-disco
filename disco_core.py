@@ -18,9 +18,10 @@ except Exception:
     btrack_bt = None
 
 try:
-    from beat_plugin_loader import create_plugin_tracker
+    from beat_plugin_loader import create_plugin_tracker, plugin_statuses
 except Exception:
     create_plugin_tracker = None
+    plugin_statuses = None
 
 try:
     import paho.mqtt.client as mqtt
@@ -150,6 +151,7 @@ class DiscoEngine:
         self.beattracker = None
         self.beattracker_input_rate = int(self.cfg.get('sample_rate', 44100))
         self.detector_init_error = ''
+        self.detector_statuses = {}
         self.aubio_onset = None
         self.reload()
 
@@ -179,6 +181,60 @@ class DiscoEngine:
             api_app_key=self.cfg.get('app_key', ''),
             api_base_path=self.cfg.get('api_base_path', '/api'),
         )
+
+    def _detector_statuses(self):
+        statuses = {
+            'native': {
+                'name': 'native',
+                'display_name': 'Native',
+                'available': True,
+                'message': 'Built in lightweight detector.',
+            },
+            'aubio': {
+                'name': 'aubio',
+                'display_name': 'aubio-ledfx',
+                'available': aubio is not None,
+                'message': 'Available' if aubio is not None else 'Python module aubio is not installed or failed to import.',
+            },
+            'btrack': {
+                'name': 'btrack',
+                'display_name': 'BTrack',
+                'available': btrack_bt is not None,
+                'message': 'Available' if btrack_bt is not None else 'Python module btrack_beat_tracker is not installed or failed to import.',
+            },
+        }
+        plugin_map = {}
+        if plugin_statuses is not None:
+            try:
+                plugin_map = plugin_statuses()
+            except Exception as exc:
+                plugin_map = {'_loader': {'available': False, 'message': str(exc)}}
+        else:
+            plugin_map = {'_loader': {'available': False, 'message': 'beat_plugin_loader could not be imported.'}}
+
+        fresh = plugin_map.get('fresh_flux_pll') or {}
+        loader_error = plugin_map.get('_loader', {}).get('message', 'Plugin is missing or failed to load.')
+        statuses['beattracker'] = {
+            'name': 'beattracker',
+            'display_name': 'Native Flux PLL BeatTracker',
+            'available': bool(fresh.get('available')),
+            'message': fresh.get('message') or loader_error,
+        }
+        beatnet = plugin_map.get('beatnet') or {}
+        statuses['beatnet'] = {
+            'name': 'beatnet',
+            'display_name': 'BeatNet neural BeatTracker',
+            'available': bool(beatnet.get('available')),
+            'message': beatnet.get('message') or 'BeatNet plugin is missing or failed to load.',
+        }
+        selected = str(self.cfg.get('detector_backend', 'native'))
+        if selected == 'native_flux_pll':
+            selected = 'beattracker'
+        if selected in statuses and self.detector_init_error:
+            statuses[selected] = dict(statuses[selected])
+            statuses[selected]['available'] = False
+            statuses[selected]['message'] = self.detector_init_error
+        return statuses
 
     def _init_detectors(self):
         self.beattracker = None
@@ -232,6 +288,7 @@ class DiscoEngine:
     def reload(self):
         self.cfg = load_config(self.config_path)
         self._init_detectors()
+        self.detector_statuses = self._detector_statuses()
         self.mqtt = MQTTReporter(self.cfg)
         if self.cfg.get('app_key') and self.cfg.get('client_key'):
             self._clear_error()
@@ -1136,6 +1193,7 @@ class DiscoEngine:
             'mode': self.state.mode,
             'backend_mode': self.state.backend_mode,
             'detector_backend': self.cfg.get('detector_backend', 'native'),
+            'detector_statuses': self.detector_statuses,
             'beat_mode': self.state.beat_mode,
             'render_mode': self.state.render_mode,
             'active_profile': self.state.active_profile,
@@ -1166,6 +1224,7 @@ class DiscoEngine:
             'mode': self.state.mode,
             'backend_mode': self.state.backend_mode,
             'detector_backend': self.cfg.get('detector_backend', 'native'),
+            'detector_statuses': self.detector_statuses,
             'bridge_ip': self.state.bridge_ip,
             'entertainment_group_id': self.state.entertainment_group_id,
             'sample_rate': self.state.sample_rate,

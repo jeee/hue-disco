@@ -86,14 +86,34 @@
       <h3 class="section-title">Beat detection</h3>
       <div class="grid">
         <div>
+          {% set detector_statuses = state.detector_statuses or {} %}
+          {% set selected_detector = 'beattracker' if state.detector_backend == 'native_flux_pll' else state.detector_backend %}
+          {% set selected_detector_status = detector_statuses.get(selected_detector, {}) %}
           <label>Detector backend <span class="info-tip" tabindex="0" data-tip="Native Flux PLL BeatTracker is our local no-neural-network spectral-flux tracker with phase-locked beat prediction. It uses the same lightweight native signal path as the standalone tracker.">i</span></label>
-          <select name="detector_backend">
-            <option value="native" {% if state.detector_backend == 'native' %}selected{% endif %}>Native</option>
-            <option value="aubio" {% if state.detector_backend == 'aubio' %}selected{% endif %}>aubio-ledfx</option>
-            <option value="btrack" {% if state.detector_backend == 'btrack' %}selected{% endif %}>BTrack</option>
-            <option value="beattracker" {% if state.detector_backend in ['beattracker', 'native_flux_pll'] %}selected{% endif %}>Native Flux PLL BeatTracker</option>
-            <option value="beatnet" {% if state.detector_backend == 'beatnet' %}selected{% endif %}>BeatNet neural BeatTracker</option>
+          <select name="detector_backend" class="{% if selected_detector_status and not selected_detector_status.available %}has-error{% endif %}">
+            {% for detector in [
+              {'value':'native','label':'Native'},
+              {'value':'aubio','label':'aubio-ledfx'},
+              {'value':'btrack','label':'BTrack'},
+              {'value':'beattracker','label':'Native Flux PLL BeatTracker'},
+              {'value':'beatnet','label':'BeatNet neural BeatTracker'}
+            ] %}
+              {% set st = detector_statuses.get(detector.value, {}) %}
+              {% set unavailable = st and not st.available %}
+              <option value="{{ detector.value }}" class="{% if unavailable %}unavailable{% endif %}" {% if (detector.value == 'beattracker' and state.detector_backend in ['beattracker', 'native_flux_pll']) or state.detector_backend == detector.value %}selected{% endif %}>{{ detector.label }}{% if unavailable %} — unavailable{% endif %}</option>
+            {% endfor %}
           </select>
+          <div class="status-list tiny">
+            {% for key in ['native', 'aubio', 'btrack', 'beattracker', 'beatnet'] %}
+              {% set st = detector_statuses.get(key) %}
+              {% if st %}
+              <div class="status-row {% if not st.available %}bad{% endif %}">
+                <span><strong>{{ st.display_name }}</strong><br>{{ st.message }}</span>
+                <span class="{% if st.available %}ok{% else %}error{% endif %}">{{ 'available' if st.available else 'unavailable' }}</span>
+              </div>
+              {% endif %}
+            {% endfor %}
+          </div>
         </div>
         <div>
           <label>Beat mode <span class="info-tip" tabindex="0" data-tip="Onset only fires on detected hits. Phase locked builds a shared beat grid so multiple bulbs stay together even between strong hits.">i</span></label>

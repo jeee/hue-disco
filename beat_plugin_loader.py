@@ -47,6 +47,30 @@ def discover_plugins(plugin_dir: str | Path | None = None) -> dict[str, dict[str
     return out
 
 
+def plugin_statuses(plugin_dir: str | Path | None = None) -> dict[str, dict[str, Any]]:
+    statuses: dict[str, dict[str, Any]] = {}
+    for name, item in discover_plugins(plugin_dir).items():
+        status = {
+            'name': name,
+            'display_name': item.get('display_name', name),
+            'available': False,
+            'message': '',
+        }
+        if item.get('error'):
+            status['message'] = str(item['error'])
+        else:
+            try:
+                check = getattr(item['module'], 'check_available', None)
+                if callable(check):
+                    check()
+                status['available'] = True
+                status['message'] = 'Available'
+            except Exception as exc:
+                status['message'] = str(exc)
+        statuses[name] = status
+    return statuses
+
+
 def create_plugin_tracker(name: str, config: dict, plugin_dir: str | Path | None = None):
     plugins = discover_plugins(plugin_dir)
     item = plugins.get(name)

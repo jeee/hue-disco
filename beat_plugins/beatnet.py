@@ -21,6 +21,12 @@ def _compat_patch():
             setattr(np, name, value)
 
 
+def check_available():
+    _compat_patch()
+    from BeatNet.BeatNet import BeatNet  # noqa: F401
+    return True
+
+
 class BeatNetPLL(FreshBeatTracker):
     def __init__(self, cfg, model_no=2, device='cpu', eval_interval_s=0.50, buffer_seconds=8.0):
         _compat_patch()

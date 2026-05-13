@@ -573,7 +573,7 @@ class DiscoEngine:
     def _make_profile_payload(self, audio_metrics, now=None):
         now = now or time.time()
         profile_defaults, groups = self._build_profile_groups()
-        chase_indices = [idx for idx, group in enumerate(groups) if str(group['settings'].get('render_mode') or '').lower() == 'beat_chase']
+        chase_indices = [idx for idx, group in enumerate(groups) if str(group['settings'].get('render_mode') or '').lower() == 'beat_chase' and group.get('light_ids')]
         active_chase_idx = None
         chase_cycle_index = 0
         if chase_indices:

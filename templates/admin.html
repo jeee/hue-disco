@@ -790,9 +790,12 @@ function validateProfiles() {
       return;
     }
     groups.forEach(group => {
-      if (!group.light_ids || !group.light_ids.length) {
+      const groupLights = group.light_ids || [];
+      const renderMode = String((group.overrides || {}).render_mode || (profile.profile_defaults || {}).render_mode || '').toLowerCase();
+      if (!groupLights.length && renderMode === 'beat_chase') {
+        messages.push(`Profile "${profile.name || key}" has empty beat_chase group "${group.name}". Empty chase groups create black gaps; delete it, assign lights, or change its render mode.`);
       }
-      (group.light_ids || []).forEach(lid => {
+      groupLights.forEach(lid => {
         if (used.has(lid)) messages.push(`Profile "${profile.name || key}" assigns light ${lid} to both "${used.get(lid)}" and "${group.name}".`);
         used.set(lid, group.name);
         assigned.add(String(lid));

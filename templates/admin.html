@@ -90,7 +90,7 @@
           {% set selected_detector = 'beattracker' if state.detector_backend == 'native_flux_pll' else state.detector_backend %}
           {% set selected_detector_status = detector_statuses.get(selected_detector, {}) %}
           <label>Detector backend <span class="info-tip" tabindex="0" data-tip="Native Flux PLL BeatTracker is our local no-neural-network spectral-flux tracker with phase-locked beat prediction. It uses the same lightweight native signal path as the standalone tracker.">i</span></label>
-          <select name="detector_backend" class="{% if selected_detector_status and not selected_detector_status.available %}has-error{% endif %}">
+          <select id="detector-backend-select" name="detector_backend" class="{% if selected_detector_status and not selected_detector_status.available %}has-error{% endif %}">
             {% for detector in [
               {'value':'native','label':'Native'},
               {'value':'aubio','label':'aubio-ledfx'},
@@ -100,19 +100,16 @@
             ] %}
               {% set st = detector_statuses.get(detector.value, {}) %}
               {% set unavailable = st and not st.available %}
-              <option value="{{ detector.value }}" class="{% if unavailable %}unavailable{% endif %}" {% if (detector.value == 'beattracker' and state.detector_backend in ['beattracker', 'native_flux_pll']) or state.detector_backend == detector.value %}selected{% endif %}>{{ detector.label }}{% if unavailable %} — unavailable{% endif %}</option>
+              <option value="{{ detector.value }}" class="{% if unavailable %}unavailable{% endif %}" data-status-name="{{ st.display_name if st else detector.label }}" data-status-message="{{ st.message if st else 'Status unavailable until restart/reload.' }}" data-status-available="{{ 'true' if (st and st.available) else 'false' }}" {% if (detector.value == 'beattracker' and state.detector_backend in ['beattracker', 'native_flux_pll']) or state.detector_backend == detector.value %}selected{% endif %}>{{ detector.label }}{% if unavailable %} — unavailable{% endif %}</option>
             {% endfor %}
           </select>
           <div class="status-list tiny">
-            {% for key in ['native', 'aubio', 'btrack', 'beattracker', 'beatnet'] %}
-              {% set st = detector_statuses.get(key) %}
-              {% if st %}
-              <div class="status-row {% if not st.available %}bad{% endif %}">
-                <span><strong>{{ st.display_name }}</strong><br>{{ st.message }}</span>
-                <span class="{% if st.available %}ok{% else %}error{% endif %}">{{ 'available' if st.available else 'unavailable' }}</span>
-              </div>
-              {% endif %}
-            {% endfor %}
+            {% if selected_detector_status %}
+            <div id="selected-detector-status" class="status-row {% if not selected_detector_status.available %}bad{% endif %}">
+              <span><strong>{{ selected_detector_status.display_name }}</strong><br><span class="status-message">{{ selected_detector_status.message }}</span></span>
+              <span class="status-availability {% if selected_detector_status.available %}ok{% else %}error{% endif %}">{{ 'available' if selected_detector_status.available else 'unavailable' }}</span>
+            </div>
+            {% endif %}
           </div>
         </div>
         <div>
@@ -131,23 +128,23 @@
           </select>
         </div>
         <div>
-          <label>Render FPS</label>
+          <label>Render FPS <span class="info-tip" tabindex="0" data-tip="Maximum light output refresh rate. Higher can feel smoother but costs more CPU/network and may not help Hue bulbs. Typical range: 15–30.">i</span></label>
           <input name="render_fps" value="{{ state.render_fps }}">
         </div>
         <div>
-          <label>BPM floor</label>
+          <label>BPM floor <span class="info-tip" tabindex="0" data-tip="Lowest tempo the phase-locked beat tracker should consider. Set below the slowest music you expect; too low can make false half-time locks easier.">i</span></label>
           <input name="bpm_min" value="{{ state.bpm_min }}">
         </div>
         <div>
-          <label>BPM ceiling</label>
+          <label>BPM ceiling <span class="info-tip" tabindex="0" data-tip="Highest tempo the beat tracker should consider. Set above the fastest music you expect; too high can make false double-time locks easier.">i</span></label>
           <input name="bpm_max" value="{{ state.bpm_max }}">
         </div>
         <div>
-          <label>Beat band low Hz</label>
+          <label>Beat band low Hz <span class="info-tip" tabindex="0" data-tip="Lower edge of the frequency band used for bass/beat energy. Around 45 Hz catches kick fundamentals without too much rumble.">i</span></label>
           <input name="beat_band_low_hz" value="{{ state.beat_band_low_hz }}">
         </div>
         <div>
-          <label>Beat band high Hz</label>
+          <label>Beat band high Hz <span class="info-tip" tabindex="0" data-tip="Upper edge of the beat-energy band. Around 120–150 Hz catches kick punch; raising it includes more bass instruments and can make detection busier.">i</span></label>
           <input name="beat_band_high_hz" value="{{ state.beat_band_high_hz }}">
         </div>
       </div>
@@ -162,18 +159,18 @@
     <div class="card stack">
       <h3 class="section-title">Audio and timing basics</h3>
       <div class="grid">
-        <div><label>Sample rate</label><input name="sample_rate" value="{{ state.sample_rate }}"></div>
-        <div><label>Block size</label><input name="block_size" value="{{ state.block_size }}"></div>
-        <div><label>Sensitivity</label><input name="sensitivity" value="{{ state.sensitivity }}"></div>
-        <div><label>Min interval ms</label><input name="min_interval_ms" value="{{ state.min_interval_ms }}"></div>
-        <div><label>Energy decay</label><input name="energy_decay" value="{{ state.energy_decay }}"></div>
+        <div><label>Sample rate <span class="info-tip" tabindex="0" data-tip="Audio capture rate in Hz. 44100 is standard and safest; lower values can reduce CPU but may affect detector quality or device compatibility.">i</span></label><input name="sample_rate" value="{{ state.sample_rate }}"></div>
+        <div><label>Block size <span class="info-tip" tabindex="0" data-tip="Audio buffer size per analysis step. Smaller reacts faster but costs more CPU; larger is steadier but adds latency. 1024 is a sensible default.">i</span></label><input name="block_size" value="{{ state.block_size }}"></div>
+        <div><label>Sensitivity <span class="info-tip" tabindex="0" data-tip="How readily native onset detection triggers. Higher values usually mean fewer triggers; lower values make it more eager and can cause false beats.">i</span></label><input name="sensitivity" value="{{ state.sensitivity }}"></div>
+        <div><label>Min interval ms <span class="info-tip" tabindex="0" data-tip="Minimum time between accepted beat triggers. Prevents double-triggering on the same kick/snare. Too high can miss fast music.">i</span></label><input name="min_interval_ms" value="{{ state.min_interval_ms }}"></div>
+        <div><label>Energy decay <span class="info-tip" tabindex="0" data-tip="How quickly the running energy baseline decays. Higher is smoother/slower; lower adapts faster but can be more jittery.">i</span></label><input name="energy_decay" value="{{ state.energy_decay }}"></div>
         <div><label>Beat prediction ms <span class="info-tip" tabindex="0" data-tip="Fires light output earlier to compensate for processing, network and bulb latency. Positive values usually make Hue bulbs feel more on-beat. Typical range: about 80 to 150 ms.">i</span></label><input name="beat_prediction_ms" value="{{ state.beat_prediction_ms }}"></div>
-        <div><label>Beat subdivision</label><input name="beat_subdivision" value="{{ state.beat_subdivision }}"></div>
-        <div><label>Change every beats</label><input name="change_every_beats" value="{{ state.change_every_beats }}"></div>
-        <div><label>Accent every beats</label><input name="accent_every_beats" value="{{ state.accent_every_beats }}"></div>
-        <div><label>Hue step</label><input name="hue_step" value="{{ state.hue_step }}"></div>
+        <div><label>Beat subdivision <span class="info-tip" tabindex="0" data-tip="How many grid pulses to render per detected beat. 1 means only the main beat; 2 adds eighth-note style pulses; higher can become busy.">i</span></label><input name="beat_subdivision" value="{{ state.beat_subdivision }}"></div>
+        <div><label>Change every beats <span class="info-tip" tabindex="0" data-tip="Global color-change interval in beats for legacy/global rendering. Profile and group settings can override this for room styles and beat chase.">i</span></label><input name="change_every_beats" value="{{ state.change_every_beats }}"></div>
+        <div><label>Accent every beats <span class="info-tip" tabindex="0" data-tip="How often to apply a stronger accent pulse. 4 emphasizes the downbeat in common dance/pop patterns; 8 is more subtle.">i</span></label><input name="accent_every_beats" value="{{ state.accent_every_beats }}"></div>
+        <div><label>Hue step <span class="info-tip" tabindex="0" data-tip="How far the fallback hue advances when colors change, in degrees on the color wheel. Larger values jump more dramatically.">i</span></label><input name="hue_step" value="{{ state.hue_step }}"></div>
       </div>
-      <label>Audio device</label>
+      <label>Audio device <span class="info-tip" tabindex="0" data-tip="Optional sounddevice input name or index. Leave blank to use the system default audio input.">i</span></label>
       <input name="audio_device" value="{{ state.audio_device if state.audio_device is not none else '' }}">
       <div class="help">
         <strong>CPU vs detector quality</strong>
@@ -201,10 +198,10 @@
             <option value="adaptive" {% if state.intensity_mode == 'adaptive' %}selected{% endif %}>Adaptive</option>
           </select>
         </div>
-        <div><label>Min pulse level</label><input name="min_pulse_level" value="{{ state.profile_defaults.min_pulse_level }}"></div>
-        <div><label>Max pulse level</label><input name="max_pulse_level" value="{{ state.profile_defaults.max_pulse_level }}"></div>
-        <div><label>Audio intensity gain</label><input name="audio_intensity_gain" value="{{ state.profile_defaults.audio_intensity_gain }}"></div>
-        <div><label>Audio gate threshold</label><input name="audio_gate_threshold" value="{{ state.profile_defaults.audio_gate_threshold }}"></div>
+        <div><label>Min pulse level <span class="info-tip" tabindex="0" data-tip="Minimum pulse strength after gating/adaptive scaling. Raise it if pulses disappear too easily; lower it for softer quiet passages.">i</span></label><input name="min_pulse_level" value="{{ state.profile_defaults.min_pulse_level }}"></div>
+        <div><label>Max pulse level <span class="info-tip" tabindex="0" data-tip="Maximum pulse strength cap. Lower it to keep the room calmer even on loud beats.">i</span></label><input name="max_pulse_level" value="{{ state.profile_defaults.max_pulse_level }}"></div>
+        <div><label>Audio intensity gain <span class="info-tip" tabindex="0" data-tip="Multiplier for audio-reactive brightness. Higher makes pulses react more strongly to loud/current audio.">i</span></label><input name="audio_intensity_gain" value="{{ state.profile_defaults.audio_intensity_gain }}"></div>
+        <div><label>Audio gate threshold <span class="info-tip" tabindex="0" data-tip="Minimum audio activity before gated/adaptive rendering responds. Raise it to ignore quiet background noise; lower it for subtle music.">i</span></label><input name="audio_gate_threshold" value="{{ state.profile_defaults.audio_gate_threshold }}"></div>
       </div>
       <div class="help">
         <strong>Render mode guide</strong>
@@ -240,40 +237,40 @@
             <div><label>Description</label><input id="profile-description"></div>
           </div>
           <div class="grid">
-            <div><label>Default render mode</label><select id="profile-render-mode"><option>hybrid</option><option>color_only</option><option>pulse_only</option><option>beat_chase</option><option>calibration</option></select></div>
-            <div><label>Default intensity mode</label><select id="profile-intensity-mode"><option>adaptive</option><option>audio</option><option>fixed</option></select></div>
-            <div><label>Default grid behavior</label><select id="profile-grid-behavior"><option>adaptive</option><option>gated</option><option>continuous</option></select></div>
+            <div><label>Default render mode <span class="info-tip" tabindex="0" data-tip="Room-wide default for groups unless a group overrides it. Hybrid is normal; beat_chase is for alternating groups; calibration is for timing tests.">i</span></label><select id="profile-render-mode"><option>hybrid</option><option>color_only</option><option>pulse_only</option><option>beat_chase</option><option>calibration</option></select></div>
+            <div><label>Default intensity mode <span class="info-tip" tabindex="0" data-tip="Room-wide default pulse strength behavior. Adaptive is usually safest; audio is more reactive; fixed ignores audio level.">i</span></label><select id="profile-intensity-mode"><option>adaptive</option><option>audio</option><option>fixed</option></select></div>
+            <div><label>Default grid behavior <span class="info-tip" tabindex="0" data-tip="Room-wide default beat-grid behavior. Continuous always pulses; gated only when audio supports it; adaptive blends between them.">i</span></label><select id="profile-grid-behavior"><option>adaptive</option><option>gated</option><option>continuous</option></select></div>
             <div>
-              <label>Palette colors</label>
+              <label>Palette colors <span class="info-tip" tabindex="0" data-tip="Main colors this profile should use. Groups inherit these unless they define their own palette or static color.">i</span></label>
               <input id="profile-palette" type="hidden">
               <div id="profile-palette-editor" class="palette-editor"></div>
             </div>
-            <div><label>Palette bias</label><select id="profile-palette-bias"><option>mixed</option><option>warm</option><option>cool</option><option>vivid</option><option>pastel</option><option>deep</option></select></div>
+            <div><label>Palette bias <span class="info-tip" tabindex="0" data-tip="Sorts/preferentially selects colors from the palette. Mixed keeps the palette order; warm/cool/vivid/pastel/deep bias the visual mood.">i</span></label><select id="profile-palette-bias"><option>mixed</option><option>warm</option><option>cool</option><option>vivid</option><option>pastel</option><option>deep</option></select></div>
             <div>
-              <label>Static color</label>
+              <label>Static color <span class="info-tip" tabindex="0" data-tip="Optional single fixed color for this profile. Leave blank to use the palette.">i</span></label>
               <div class="color-row"><input id="profile-static-color" type="text" placeholder="#RRGGBB"><input id="profile-static-color-picker" type="color" value="#FFFFFF"></div>
             </div>
           </div>
           <div class="help"><strong>Profile defaults</strong> These values are the room-wide defaults for this profile. Groups inherit them and only need to override what should differ. Put the main room palette here, then use group palettes only when one set of lights should intentionally look different.</div>
           <div class="grid">
-            <div><label>Base brightness</label><input id="profile-base-brightness"></div>
-            <div><label>Peak brightness</label><input id="profile-peak-brightness"></div>
-            <div><label>Pulse attack ms</label><input id="profile-attack"></div>
-            <div><label>Pulse hold ms</label><input id="profile-hold"></div>
-            <div><label>Pulse decay ms</label><input id="profile-decay"></div>
-            <div><label>Pulse mix</label><input id="profile-pulse-mix"></div>
-            <div><label>Pulse intensity</label><input id="profile-pulse-intensity"></div>
-            <div><label>Color motion</label><input id="profile-color-motion"></div>
-            <div><label>Color step scale</label><input id="profile-color-step"></div>
+            <div><label>Base brightness <span class="info-tip" tabindex="0" data-tip="Normal brightness when a light is not pulsing. 0 is off; 255 is full RGB output before per-light caps.">i</span></label><input id="profile-base-brightness"></div>
+            <div><label>Peak brightness <span class="info-tip" tabindex="0" data-tip="Brightness target at the top of a pulse. Must be at least base brightness.">i</span></label><input id="profile-peak-brightness"></div>
+            <div><label>Pulse attack ms <span class="info-tip" tabindex="0" data-tip="How quickly a pulse rises after a beat. Lower is snappier; higher is smoother.">i</span></label><input id="profile-attack"></div>
+            <div><label>Pulse hold ms <span class="info-tip" tabindex="0" data-tip="How long the pulse stays near peak before fading.">i</span></label><input id="profile-hold"></div>
+            <div><label>Pulse decay ms <span class="info-tip" tabindex="0" data-tip="How long the pulse takes to fade back down. Longer gives a smoother wash; shorter gives sharper hits.">i</span></label><input id="profile-decay"></div>
+            <div><label>Pulse mix <span class="info-tip" tabindex="0" data-tip="How much white/brightness pulse is blended into the colored layer. 0 is mostly color; 1 is punchier white pulse.">i</span></label><input id="profile-pulse-mix"></div>
+            <div><label>Pulse intensity <span class="info-tip" tabindex="0" data-tip="Overall pulse strength multiplier for this profile. Higher is more energetic.">i</span></label><input id="profile-pulse-intensity"></div>
+            <div><label>Color motion <span class="info-tip" tabindex="0" data-tip="Continuous time-based color drift speed for non-chase rendering. 0 freezes motion except beat/color-step changes.">i</span></label><input id="profile-color-motion"></div>
+            <div><label>Color step scale <span class="info-tip" tabindex="0" data-tip="How far palette selection advances on each color step. Larger values jump through the palette faster.">i</span></label><input id="profile-color-step"></div>
             <div><label>Change/chase every beats <span class="info-tip" tabindex="0" data-tip="For color motion this controls how often colors step. For beat_chase groups this controls how many beats each chase group stays active before moving to the next group. Use 4 for a slow four-beat group alternation.">i</span></label><input id="profile-change-every"></div>
-            <div><label>Accent every beats</label><input id="profile-accent-every"></div>
-            <div><label>Accent multiplier</label><input id="profile-accent-multiplier"></div>
-            <div><label>Group activity</label><input id="profile-group-activity"></div>
-            <div><label>Min pulse level</label><input id="profile-min-pulse"></div>
-            <div><label>Max pulse level</label><input id="profile-max-pulse"></div>
-            <div><label>Audio gain</label><input id="profile-audio-gain"></div>
-            <div><label>Audio gate</label><input id="profile-audio-gate"></div>
-            <div><label>Beat chase off %</label><input id="profile-chase-off"></div>
+            <div><label>Accent every beats <span class="info-tip" tabindex="0" data-tip="How often this profile emphasizes a beat. 4 often matches dance/pop downbeats; 8 is subtler.">i</span></label><input id="profile-accent-every"></div>
+            <div><label>Accent multiplier <span class="info-tip" tabindex="0" data-tip="How much stronger accent beats are. 1 means no accent boost.">i</span></label><input id="profile-accent-multiplier"></div>
+            <div><label>Group activity <span class="info-tip" tabindex="0" data-tip="Overall activity multiplier for inherited group behavior. Lower calms groups down; higher makes them more active.">i</span></label><input id="profile-group-activity"></div>
+            <div><label>Min pulse level <span class="info-tip" tabindex="0" data-tip="Minimum pulse strength after adaptive/gated scaling.">i</span></label><input id="profile-min-pulse"></div>
+            <div><label>Max pulse level <span class="info-tip" tabindex="0" data-tip="Maximum pulse strength cap for this profile.">i</span></label><input id="profile-max-pulse"></div>
+            <div><label>Audio gain <span class="info-tip" tabindex="0" data-tip="How strongly current audio level affects this profile's pulse intensity.">i</span></label><input id="profile-audio-gain"></div>
+            <div><label>Audio gate <span class="info-tip" tabindex="0" data-tip="Minimum audio activity needed before gated/adaptive behavior responds.">i</span></label><input id="profile-audio-gate"></div>
+            <div><label>Beat chase off % <span class="info-tip" tabindex="0" data-tip="Brightness percentage for inactive beat_chase groups. 0 means off; 10–20 gives a dim background glow.">i</span></label><input id="profile-chase-off"></div>
             <div><label>Beat chase color motion <span class="info-tip" tabindex="0" data-tip="0 holds one color for the whole chase activation. Higher values rotate through the palette while the group is held on, like the earlier behavior.">i</span></label><input id="profile-chase-color-motion"></div>
           </div>
         </div>
@@ -297,40 +294,40 @@
             </div>
             <div class="stack">
               <div class="grid">
-                <div><label>Group name</label><input id="group-name"></div>
-                <div><label>Role</label><select id="group-role"><option>custom</option><option>ambient</option><option>main</option><option>accent</option><option>background</option><option>percussive</option><option>melodic</option></select></div>
+                <div><label>Group name <span class="info-tip" tabindex="0" data-tip="Human-readable name for this set of lights inside the profile.">i</span></label><input id="group-name"></div>
+                <div><label>Role <span class="info-tip" tabindex="0" data-tip="Descriptive role for organization. It helps you remember intent; rendering is controlled by the settings below.">i</span></label><select id="group-role"><option>custom</option><option>ambient</option><option>main</option><option>accent</option><option>background</option><option>percussive</option><option>melodic</option></select></div>
                 <div><label>Render mode <span class="info-tip" tabindex="0" data-tip="Hybrid is the normal music mode. Beat chase holds one beat-chase group steadily on for Change/chase every beats, while other beat-chase groups go to the configured off percentage. Calibration is only for timing tests.">i</span></label><select id="group-render-mode"><option>hybrid</option><option>color_only</option><option>pulse_only</option><option>beat_chase</option><option>calibration</option></select></div>
                 <div><label>Intensity mode <span class="info-tip" tabindex="0" data-tip="Fixed gives every pulse the same strength. Audio follows current signal strength. Adaptive keeps a base pulse but grows stronger on stronger musical moments.">i</span></label><select id="group-intensity-mode"><option>adaptive</option><option>audio</option><option>fixed</option></select></div>
                 <div><label>Grid behavior <span class="info-tip" tabindex="0" data-tip="Continuous always pulses on the beat grid. Gated only pulses when current audio supports it. Adaptive scales pulse strength with the audio.">i</span></label><select id="group-grid-behavior"><option>adaptive</option><option>gated</option><option>continuous</option></select></div>
                 <div>
-                  <label>Palette colors</label>
+                  <label>Palette colors <span class="info-tip" tabindex="0" data-tip="Optional colors just for this group. Leave empty to inherit the profile palette.">i</span></label>
                   <input id="group-palette" type="hidden">
                   <div id="group-palette-editor" class="palette-editor"></div>
                 </div>
-                <div><label>Palette bias</label><select id="group-palette-bias"><option>mixed</option><option>warm</option><option>cool</option><option>vivid</option><option>pastel</option><option>deep</option></select></div>
+                <div><label>Palette bias <span class="info-tip" tabindex="0" data-tip="Color mood preference for this group: mixed keeps order; warm/cool/vivid/pastel/deep bias the chosen palette colors.">i</span></label><select id="group-palette-bias"><option>mixed</option><option>warm</option><option>cool</option><option>vivid</option><option>pastel</option><option>deep</option></select></div>
                 <div>
-                  <label>Static color</label>
+                  <label>Static color <span class="info-tip" tabindex="0" data-tip="Optional fixed color for this group. Leave blank to use the group/profile palette.">i</span></label>
                   <div class="color-row"><input id="group-static-color" type="text" placeholder="#RRGGBB"><input id="group-static-color-picker" type="color" value="#FFFFFF"></div>
                 </div>
-                <div><label>Base brightness</label><input id="group-base"></div>
-                <div><label>Peak brightness</label><input id="group-peak"></div>
-                <div><label>Attack ms</label><input id="group-attack"></div>
-                <div><label>Hold ms</label><input id="group-hold"></div>
-                <div><label>Decay ms</label><input id="group-decay"></div>
-                <div><label>Pulse mix</label><input id="group-pulse-mix"></div>
-                <div><label>Pulse intensity</label><input id="group-pulse-intensity"></div>
-                <div><label>Color motion</label><input id="group-color-motion"></div>
-                <div><label>Color step</label><input id="group-color-step"></div>
-                <div><label>Change/chase every</label><input id="group-change-every"></div>
-                <div><label>Activity</label><input id="group-activity"></div>
-                <div><label>Accent every</label><input id="group-accent-every"></div>
-                <div><label>Accent multiplier</label><input id="group-accent-multiplier"></div>
-                <div><label>Min pulse</label><input id="group-min-pulse"></div>
-                <div><label>Max pulse</label><input id="group-max-pulse"></div>
-                <div><label>Audio gain</label><input id="group-audio-gain"></div>
-                <div><label>Audio gate</label><input id="group-audio-gate"></div>
-                <div><label>Beat chase off %</label><input id="group-chase-off"></div>
-                <div><label>Beat chase color motion</label><input id="group-chase-color-motion"></div>
+                <div><label>Base brightness <span class="info-tip" tabindex="0" data-tip="Normal brightness for this group when not pulsing.">i</span></label><input id="group-base"></div>
+                <div><label>Peak brightness <span class="info-tip" tabindex="0" data-tip="Brightness target at pulse peak or when this beat_chase group is active.">i</span></label><input id="group-peak"></div>
+                <div><label>Attack ms <span class="info-tip" tabindex="0" data-tip="Pulse rise time for this group. Lower is sharper; higher is smoother.">i</span></label><input id="group-attack"></div>
+                <div><label>Hold ms <span class="info-tip" tabindex="0" data-tip="How long this group's pulse stays near peak.">i</span></label><input id="group-hold"></div>
+                <div><label>Decay ms <span class="info-tip" tabindex="0" data-tip="How long this group's pulse takes to fade back down.">i</span></label><input id="group-decay"></div>
+                <div><label>Pulse mix <span class="info-tip" tabindex="0" data-tip="Amount of white/brightness pulse mixed into this group's color layer.">i</span></label><input id="group-pulse-mix"></div>
+                <div><label>Pulse intensity <span class="info-tip" tabindex="0" data-tip="Pulse strength multiplier for this group.">i</span></label><input id="group-pulse-intensity"></div>
+                <div><label>Color motion <span class="info-tip" tabindex="0" data-tip="Continuous color drift speed for non-chase rendering in this group.">i</span></label><input id="group-color-motion"></div>
+                <div><label>Color step <span class="info-tip" tabindex="0" data-tip="How quickly this group steps through palette colors on beat/color changes.">i</span></label><input id="group-color-step"></div>
+                <div><label>Change/chase every <span class="info-tip" tabindex="0" data-tip="For beat_chase, how many beats this group stays active before the next chase group. For normal color motion, how often color steps happen.">i</span></label><input id="group-change-every"></div>
+                <div><label>Activity <span class="info-tip" tabindex="0" data-tip="Activity multiplier for this group. Lower for background/ambient groups; higher for accent/percussive groups.">i</span></label><input id="group-activity"></div>
+                <div><label>Accent every <span class="info-tip" tabindex="0" data-tip="How often this group gets a stronger accent beat.">i</span></label><input id="group-accent-every"></div>
+                <div><label>Accent multiplier <span class="info-tip" tabindex="0" data-tip="Strength boost for this group's accent beats. 1 disables accent boost.">i</span></label><input id="group-accent-multiplier"></div>
+                <div><label>Min pulse <span class="info-tip" tabindex="0" data-tip="Minimum pulse strength for this group after adaptive/gated scaling.">i</span></label><input id="group-min-pulse"></div>
+                <div><label>Max pulse <span class="info-tip" tabindex="0" data-tip="Maximum pulse strength cap for this group.">i</span></label><input id="group-max-pulse"></div>
+                <div><label>Audio gain <span class="info-tip" tabindex="0" data-tip="How strongly current audio affects this group's pulse strength.">i</span></label><input id="group-audio-gain"></div>
+                <div><label>Audio gate <span class="info-tip" tabindex="0" data-tip="Minimum audio activity needed before this group reacts in gated/adaptive modes.">i</span></label><input id="group-audio-gate"></div>
+                <div><label>Beat chase off % <span class="info-tip" tabindex="0" data-tip="Brightness percentage while this beat_chase group is inactive. 0 is off; 10–20 keeps a dim glow.">i</span></label><input id="group-chase-off"></div>
+                <div><label>Beat chase color motion <span class="info-tip" tabindex="0" data-tip="0 holds one color while this group is active. Higher values rotate colors while the group remains on.">i</span></label><input id="group-chase-color-motion"></div>
               </div>
               <div class="help"><strong>Group design tip</strong> Use groups for behavior. For a slow ceiling chase, split the 20 spots into 4 groups, set those groups to <span class="mono">beat_chase</span>, set Change/chase every to e.g. 4, and set Beat chase off % to 0 for true off or e.g. 10–20 for a dim glow. Each chase group stays steadily on for its own Change/chase every value. Keep Beat chase color motion at 0 to hold one color, or raise it to rotate colors while held on.</div>
               <div>
@@ -363,18 +360,18 @@
         </div>
         <div class="stack">
           <div class="grid">
-            <div><label>Default strobe seconds</label><input name="strobe_seconds" value="{{ state.strobe_seconds }}"></div>
-            <div><label>Default on ms</label><input name="strobe_on_ms" value="{{ state.strobe_on_ms }}"></div>
-            <div><label>Default off ms</label><input name="strobe_off_ms" value="{{ state.strobe_off_ms }}"></div>
-            <div><label>Default sync mode</label><select name="strobe_sync_mode"><option value="free" {% if state.strobe_sync_mode == 'free' %}selected{% endif %}>Free</option><option value="beat_locked" {% if state.strobe_sync_mode == 'beat_locked' %}selected{% endif %}>Beat locked</option></select></div>
+            <div><label>Default strobe seconds <span class="info-tip" tabindex="0" data-tip="Fallback duration for quick strobe actions.">i</span></label><input name="strobe_seconds" value="{{ state.strobe_seconds }}"></div>
+            <div><label>Default on ms <span class="info-tip" tabindex="0" data-tip="How long each strobe flash stays on. Very low values may be limited by Hue/Zigbee latency.">i</span></label><input name="strobe_on_ms" value="{{ state.strobe_on_ms }}"></div>
+            <div><label>Default off ms <span class="info-tip" tabindex="0" data-tip="How long each strobe flash stays off between flashes.">i</span></label><input name="strobe_off_ms" value="{{ state.strobe_off_ms }}"></div>
+            <div><label>Default sync mode <span class="info-tip" tabindex="0" data-tip="Free runs at the configured on/off timing. Beat locked tries to align flashes to the current beat grid.">i</span></label><select name="strobe_sync_mode"><option value="free" {% if state.strobe_sync_mode == 'free' %}selected{% endif %}>Free</option><option value="beat_locked" {% if state.strobe_sync_mode == 'beat_locked' %}selected{% endif %}>Beat locked</option></select></div>
           </div>
           <div class="divider"></div>
           <div class="grid">
             <div><label>Preset name</label><input id="preset-name"></div>
-            <div><label>Duration seconds</label><input id="preset-duration"></div>
-            <div><label>On ms</label><input id="preset-on"></div>
-            <div><label>Off ms</label><input id="preset-off"></div>
-            <div><label>Sync mode</label><select id="preset-sync"><option>free</option><option>beat_locked</option></select></div>
+            <div><label>Duration seconds <span class="info-tip" tabindex="0" data-tip="How long this strobe preset runs before returning to normal control.">i</span></label><input id="preset-duration"></div>
+            <div><label>On ms <span class="info-tip" tabindex="0" data-tip="Flash-on duration for this preset.">i</span></label><input id="preset-on"></div>
+            <div><label>Off ms <span class="info-tip" tabindex="0" data-tip="Flash-off duration for this preset.">i</span></label><input id="preset-off"></div>
+            <div><label>Sync mode <span class="info-tip" tabindex="0" data-tip="Free uses on/off timing directly. Beat locked attempts to align flashes to detected beat timing.">i</span></label><select id="preset-sync"><option>free</option><option>beat_locked</option></select></div>
           </div>
           <div class="help"><strong>Strobe warning</strong> True hard ON/OFF strobe is still limited by Zigbee/Hue bulb behavior. Beat-locked mode is useful for experiments, but pulse-only or hybrid profiles usually give smoother real-world results.</div>
         </div>
@@ -897,7 +894,28 @@ function deletePreset() {
   renderAll();
 }
 
+function updateSelectedDetectorStatus() {
+  const select = document.getElementById('detector-backend-select');
+  const box = document.getElementById('selected-detector-status');
+  if (!select || !box || !select.selectedOptions.length) return;
+  const opt = select.selectedOptions[0];
+  const available = opt.dataset.statusAvailable === 'true';
+  box.classList.toggle('bad', !available);
+  select.classList.toggle('has-error', !available);
+  const strong = box.querySelector('strong');
+  const message = box.querySelector('.status-message');
+  const availability = box.querySelector('.status-availability');
+  if (strong) strong.textContent = opt.dataset.statusName || opt.textContent.replace(' — unavailable', '');
+  if (message) message.textContent = opt.dataset.statusMessage || '';
+  if (availability) {
+    availability.textContent = available ? 'available' : 'unavailable';
+    availability.classList.toggle('ok', available);
+    availability.classList.toggle('error', !available);
+  }
+}
+
 document.getElementById('profile-select').addEventListener('change', e => { currentProfileKey = e.target.value; currentGroupIndex = 0; renderAll(); });
+document.getElementById('detector-backend-select').addEventListener('change', updateSelectedDetectorStatus);
 document.getElementById('group-select').addEventListener('change', e => { currentGroupIndex = Number(e.target.value || 0); renderAll(); });
 document.getElementById('preset-select').addEventListener('change', e => { currentPresetIndex = Number(e.target.value || 0); renderAll(); });
 document.getElementById('profile-name').addEventListener('change', () => persistProfileEditor(true));

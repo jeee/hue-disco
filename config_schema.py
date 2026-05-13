@@ -86,6 +86,7 @@ def _profile_defaults_template():
         'palette_bias': 'mixed',
         'static_color': '',
         'chase_off_brightness': 0,
+        'chase_color_motion': 0.0,
     }
 
 
@@ -198,6 +199,7 @@ def _normalize_profile_defaults(data):
     merged['audio_gate_threshold'] = _as_float(merged.get('audio_gate_threshold'), 0.12, 0.0, 1.0)
     merged['group_activity'] = _as_float(merged.get('group_activity'), 1.0, 0.0, 2.0)
     merged['chase_off_brightness'] = _as_float(merged.get('chase_off_brightness'), 0.0, 0.0, 100.0)
+    merged['chase_color_motion'] = _as_float(merged.get('chase_color_motion'), 0.0, 0.0, 2.0)
     merged['palette_colors'] = _normalize_palette(merged.get('palette_colors') or [])
     merged['palette_bias'] = str(merged.get('palette_bias') or 'mixed')
     static_color = str(merged.get('static_color') or '').strip()

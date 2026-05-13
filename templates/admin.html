@@ -274,6 +274,7 @@
             <div><label>Audio gain</label><input id="profile-audio-gain"></div>
             <div><label>Audio gate</label><input id="profile-audio-gate"></div>
             <div><label>Beat chase off %</label><input id="profile-chase-off"></div>
+            <div><label>Beat chase color motion <span class="info-tip" tabindex="0" data-tip="0 holds one color for the whole chase activation. Higher values rotate through the palette while the group is held on, like the earlier behavior.">i</span></label><input id="profile-chase-color-motion"></div>
           </div>
         </div>
 
@@ -329,8 +330,9 @@
                 <div><label>Audio gain</label><input id="group-audio-gain"></div>
                 <div><label>Audio gate</label><input id="group-audio-gate"></div>
                 <div><label>Beat chase off %</label><input id="group-chase-off"></div>
+                <div><label>Beat chase color motion</label><input id="group-chase-color-motion"></div>
               </div>
-              <div class="help"><strong>Group design tip</strong> Use groups for behavior. For a slow ceiling chase, split the 20 spots into 4 groups, set those groups to <span class="mono">beat_chase</span>, set Change/chase every to e.g. 4, and set Beat chase off % to 0 for true off or e.g. 10–20 for a dim glow. Each chase group stays steadily on for its own Change/chase every value and holds one color until its next activation. Groups not set to beat_chase keep rendering normally.</div>
+              <div class="help"><strong>Group design tip</strong> Use groups for behavior. For a slow ceiling chase, split the 20 spots into 4 groups, set those groups to <span class="mono">beat_chase</span>, set Change/chase every to e.g. 4, and set Beat chase off % to 0 for true off or e.g. 10–20 for a dim glow. Each chase group stays steadily on for its own Change/chase every value. Keep Beat chase color motion at 0 to hold one color, or raise it to rotate colors while held on.</div>
               <div>
                 <label>Lights in this group</label>
                 <div id="group-lights" class="grid"></div>
@@ -423,7 +425,7 @@ const defaultProfileDefaults = {
   pulse_mix: 0.45, pulse_intensity: 0.7, color_motion: 0.35, color_step_scale: 0.5, change_every_beats: 1,
   beat_subdivision: 1, accent_every_beats: 4, accent_multiplier: 1.08, min_pulse_level: 0.18, max_pulse_level: 1.0,
   audio_intensity_gain: 1.0, audio_gate_threshold: 0.12, group_activity: 1.0, palette_colors: [], palette_bias: 'mixed', static_color: '',
-  chase_off_brightness: 0
+  chase_off_brightness: 0, chase_color_motion: 0.0
 };
 
 let profiles = JSON.parse(JSON.stringify(initialProfiles));
@@ -621,6 +623,7 @@ function fillProfileEditor() {
   document.getElementById('profile-audio-gain').value = d.audio_intensity_gain;
   document.getElementById('profile-audio-gate').value = d.audio_gate_threshold;
   document.getElementById('profile-chase-off').value = d.chase_off_brightness ?? 0;
+  document.getElementById('profile-chase-color-motion').value = d.chase_color_motion ?? 0;
 }
 function fillGroupEditor() {
   const group = getCurrentGroup();
@@ -656,6 +659,7 @@ function fillGroupEditor() {
   document.getElementById('group-audio-gain').value = o.audio_intensity_gain;
   document.getElementById('group-audio-gate').value = o.audio_gate_threshold;
   document.getElementById('group-chase-off').value = o.chase_off_brightness ?? 0;
+  document.getElementById('group-chase-color-motion').value = o.chase_color_motion ?? 0;
   lights.forEach(light => {
     const lid = light.id === null ? '' : String(light.id);
     if (!lid) return;
@@ -708,7 +712,8 @@ function persistProfileEditor(rename = true) {
     max_pulse_level: Number(document.getElementById('profile-max-pulse').value || 1.0),
     audio_intensity_gain: Number(document.getElementById('profile-audio-gain').value || 1.0),
     audio_gate_threshold: Number(document.getElementById('profile-audio-gate').value || 0.12),
-    chase_off_brightness: Number(document.getElementById('profile-chase-off').value || 0)
+    chase_off_brightness: Number(document.getElementById('profile-chase-off').value || 0),
+    chase_color_motion: Number(document.getElementById('profile-chase-color-motion').value || 0)
   });
   if (rename && newKey !== oldKey) {
     profiles[newKey] = profile;
@@ -746,7 +751,8 @@ function persistGroupEditor() {
     max_pulse_level: Number(document.getElementById('group-max-pulse').value || 1.0),
     audio_intensity_gain: Number(document.getElementById('group-audio-gain').value || 1.0),
     audio_gate_threshold: Number(document.getElementById('group-audio-gate').value || 0.12),
-    chase_off_brightness: Number(document.getElementById('group-chase-off').value || 0)
+    chase_off_brightness: Number(document.getElementById('group-chase-off').value || 0),
+    chase_color_motion: Number(document.getElementById('group-chase-color-motion').value || 0)
   });
   group.light_ids = Array.from(document.querySelectorAll('#group-lights input[type=checkbox]:checked')).map(el => el.value);
   renderAll();
@@ -892,8 +898,8 @@ document.getElementById('profile-select').addEventListener('change', e => { curr
 document.getElementById('group-select').addEventListener('change', e => { currentGroupIndex = Number(e.target.value || 0); renderAll(); });
 document.getElementById('preset-select').addEventListener('change', e => { currentPresetIndex = Number(e.target.value || 0); renderAll(); });
 document.getElementById('profile-name').addEventListener('change', () => persistProfileEditor(true));
-['profile-description','profile-render-mode','profile-intensity-mode','profile-grid-behavior','profile-palette','profile-palette-bias','profile-static-color','profile-base-brightness','profile-peak-brightness','profile-attack','profile-hold','profile-decay','profile-pulse-mix','profile-pulse-intensity','profile-color-motion','profile-color-step','profile-change-every','profile-accent-every','profile-accent-multiplier','profile-group-activity','profile-min-pulse','profile-max-pulse','profile-audio-gain','profile-audio-gate','profile-chase-off'].forEach(id => document.getElementById(id).addEventListener('input', () => persistProfileEditor(id !== 'profile-name')));
-['group-name','group-role','group-render-mode','group-intensity-mode','group-grid-behavior','group-palette','group-palette-bias','group-static-color','group-base','group-peak','group-attack','group-hold','group-decay','group-pulse-mix','group-pulse-intensity','group-color-motion','group-color-step','group-change-every','group-activity','group-accent-every','group-accent-multiplier','group-min-pulse','group-max-pulse','group-audio-gain','group-audio-gate','group-chase-off'].forEach(id => document.getElementById(id).addEventListener('input', persistGroupEditor));
+['profile-description','profile-render-mode','profile-intensity-mode','profile-grid-behavior','profile-palette','profile-palette-bias','profile-static-color','profile-base-brightness','profile-peak-brightness','profile-attack','profile-hold','profile-decay','profile-pulse-mix','profile-pulse-intensity','profile-color-motion','profile-color-step','profile-change-every','profile-accent-every','profile-accent-multiplier','profile-group-activity','profile-min-pulse','profile-max-pulse','profile-audio-gain','profile-audio-gate','profile-chase-off','profile-chase-color-motion'].forEach(id => document.getElementById(id).addEventListener('input', () => persistProfileEditor(id !== 'profile-name')));
+['group-name','group-role','group-render-mode','group-intensity-mode','group-grid-behavior','group-palette','group-palette-bias','group-static-color','group-base','group-peak','group-attack','group-hold','group-decay','group-pulse-mix','group-pulse-intensity','group-color-motion','group-color-step','group-change-every','group-activity','group-accent-every','group-accent-multiplier','group-min-pulse','group-max-pulse','group-audio-gain','group-audio-gate','group-chase-off','group-chase-color-motion'].forEach(id => document.getElementById(id).addEventListener('input', persistGroupEditor));
 document.getElementById('profile-static-color-picker').addEventListener('input', e => { document.getElementById('profile-static-color').value = e.target.value.toUpperCase(); persistProfileEditor(false); });
 document.getElementById('group-static-color-picker').addEventListener('input', e => { document.getElementById('group-static-color').value = e.target.value.toUpperCase(); persistGroupEditor(); });
 ['preset-name','preset-duration','preset-on','preset-off','preset-sync'].forEach(id => document.getElementById(id).addEventListener('input', persistPresetEditor));

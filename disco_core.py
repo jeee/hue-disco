@@ -495,12 +495,14 @@ class DiscoEngine:
         r, g, b = colorsys.hsv_to_rgb((self.current_hue + group_index * 0.11) % 1.0, 1.0, 1.0)
         return int(r * 255), int(g * 255), int(b * 255)
 
-    def _stable_group_color(self, group_index, light, group_settings, profile_defaults, activation_index=0):
+    def _stable_group_color(self, group_index, light, group_settings, profile_defaults, activation_index=0, now=None):
         palette = self._bias_palette(self._palette_for_light(light, group_settings, profile_defaults), group_settings.get('palette_bias') or profile_defaults.get('palette_bias'))
+        chase_motion = max(0.0, float(group_settings.get('chase_color_motion', profile_defaults.get('chase_color_motion', 0.0))))
+        motion_offset = int((float(now or time.time()) * 0.18 * chase_motion) * len(palette)) if palette and chase_motion > 0 else 0
         if palette:
-            idx = (max(0, int(activation_index)) + group_index) % len(palette)
+            idx = (max(0, int(activation_index)) + group_index + motion_offset) % len(palette)
             return self._hex_to_rgb(palette[idx])
-        hue = ((max(0, int(activation_index)) * (float(self.cfg.get('hue_step', 18)) / 360.0)) + group_index * 0.11) % 1.0
+        hue = ((max(0, int(activation_index)) * (float(self.cfg.get('hue_step', 18)) / 360.0)) + group_index * 0.11 + (float(now or time.time()) * 0.18 * chase_motion)) % 1.0
         r, g, b = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
         return int(r * 255), int(g * 255), int(b * 255)
 
@@ -609,7 +611,7 @@ class DiscoEngine:
                 if lid is None or lid not in group['light_ids']:
                     continue
                 if render_mode == 'beat_chase':
-                    color_rgb = self._stable_group_color(idx, light, settings, profile_defaults, chase_cycle_index)
+                    color_rgb = self._stable_group_color(idx, light, settings, profile_defaults, chase_cycle_index, now)
                 else:
                     color_rgb = self._group_color(idx, light, settings, profile_defaults)
                 base_rgb = self._apply_brightness(color_rgb, base_brightness)
